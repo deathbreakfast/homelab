@@ -1,0 +1,28 @@
+---
+galaxy_info:
+  author: Homelab
+  description: Automated backup management for Paperless-ngx with cloud storage
+  company: Personal
+  license: MIT
+  min_ansible_version: "2.9"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+  galaxy_tags:
+    - paperless
+    - backup
+    - rclone
+    - cloud-storage
+    - encryption
+
+dependencies:
+  - role: rclone
+
+
+

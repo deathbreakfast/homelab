@@ -1,0 +1,30 @@
+---
+- name: Apply common configuration to all hosts
+  hosts: all
+  become: true
+  roles:
+    - common
+    - grafana_loki
+    - prometheus_monitoring
+
+- name: Configure Raspberry Pi specific settings
+  hosts: raspberry_pis
+  become: true
+  roles:
+    - raspberry_pi
+    - docker
+    - rclone
+    - paperless_ngx
+    - paperless_backup
+
+- name: Configure desktop computers
+  hosts: desktop_computers
+  become: true
+  roles:
+    - desktop
+
+- name: Configure servers
+  hosts: servers
+  become: true
+  roles:
+    - server 

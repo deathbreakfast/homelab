@@ -1,0 +1,203 @@
+#!/bin/bash
+
+# Paperless-ngx Restore Script
+# This script restores Paperless-ngx data from encrypted cloud backups
+
+set -euo pipefail
+
+# Set rclone config path
+export RCLONE_CONFIG="/etc/rclone/rclone.conf"
+
+# Configuration
+BACKUP_BASE_DIR="{{ backup_base_dir }}"
+PAPERLESS_DATA_DIR="{{ paperless_data_dir }}"
+RCLONE_REMOTE="{{ rclone_remote }}"
+RCLONE_BACKUP_PATH="{{ rclone_backup_path }}"
+
+# Usage function
+usage() {
+    echo "Usage: $0 <backup_name> [--force]"
+    echo ""
+    echo "Arguments:"
+    echo "  backup_name    Name of the backup to restore (e.g., backup-20240101_020000)"
+    echo "  --force        Force restore even if Paperless-ngx is running"
+    echo ""
+    echo "Available backups:"
+    rclone lsf "${RCLONE_REMOTE}:${RCLONE_BACKUP_PATH}/" | grep "^backup-" | sort -r
+    exit 1
+}
+
+# Logging function
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+}
+
+# Error handling
+error_exit() {
+    log "ERROR: $1"
+    exit 1
+}
+
+# Check arguments
+if [[ $# -eq 0 ]]; then
+    usage
+fi
+
+BACKUP_NAME="$1"
+FORCE_RESTORE=false
+
+if [[ $# -gt 1 && "$2" == "--force" ]]; then
+    FORCE_RESTORE=true
+fi
+
+log "Starting Paperless-ngx restore process for backup: $BACKUP_NAME"
+
+# Check if backup exists
+if ! rclone lsf "${RCLONE_REMOTE}:${RCLONE_BACKUP_PATH}/${BACKUP_NAME}/" > /dev/null 2>&1; then
+    error_exit "Backup '$BACKUP_NAME' not found in cloud storage"
+fi
+
+# Check if Paperless-ngx is running
+if docker-compose -f "${PAPERLESS_DATA_DIR}/docker-compose.yml" ps | grep -q "Up"; then
+    if [[ "$FORCE_RESTORE" == "false" ]]; then
+        error_exit "Paperless-ngx is running. Stop it first or use --force flag"
+    else
+        log "WARNING: Paperless-ngx is running but --force specified. Proceeding with restore."
+    fi
+fi
+
+# Create restore directory
+RESTORE_DIR="${BACKUP_BASE_DIR}/restore-$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$RESTORE_DIR"
+
+log "Restore directory: $RESTORE_DIR"
+
+# Download backup from cloud storage
+log "Downloading backup from cloud storage..."
+if ! rclone copy "${RCLONE_REMOTE}:${RCLONE_BACKUP_PATH}/${BACKUP_NAME}" "$RESTORE_DIR" --progress; then
+    error_exit "Failed to download backup from cloud storage"
+fi
+
+# Verify checksums if available
+if [[ -f "${RESTORE_DIR}/checksums.txt" ]]; then
+    log "Verifying backup integrity..."
+    cd "$RESTORE_DIR"
+    if sha256sum -c checksums.txt; then
+        log "Backup integrity verified"
+    else
+        error_exit "Backup integrity check failed"
+    fi
+fi
+
+# Stop Paperless-ngx services
+log "Stopping Paperless-ngx services..."
+cd "$PAPERLESS_DATA_DIR"
+docker-compose down || log "WARNING: Failed to stop services gracefully"
+
+# Create backup of current data (safety measure)
+CURRENT_BACKUP="${BACKUP_BASE_DIR}/current-backup-$(date +%Y%m%d_%H%M%S)"
+if [[ -d "${PAPERLESS_DATA_DIR}/data" ]] || [[ -d "${PAPERLESS_DATA_DIR}/media" ]]; then
+    log "Creating backup of current data at: $CURRENT_BACKUP"
+    mkdir -p "$CURRENT_BACKUP"
+    cp -r "${PAPERLESS_DATA_DIR}"/* "$CURRENT_BACKUP/" 2>/dev/null || true
+fi
+
+# Extract volumes
+log "Extracting backup volumes..."
+TEMP_VOLUMES="/tmp/paperless-restore-volumes"
+mkdir -p "$TEMP_VOLUMES"
+
+# Extract individual volume tarballs
+for volume in data media export static; do
+    if [[ -f "${RESTORE_DIR}/${volume}.tar.gz" ]]; then
+        log "Extracting ${volume} volume..."
+        mkdir -p "${TEMP_VOLUMES}/${volume}"
+        tar xzf "${RESTORE_DIR}/${volume}.tar.gz" -C "${TEMP_VOLUMES}/${volume}"
+    else
+        log "WARNING: ${volume}.tar.gz not found in backup"
+    fi
+done
+
+# Restore volumes using temporary container
+log "Restoring Docker volumes..."
+for volume in data media export static; do
+    if [[ -d "${TEMP_VOLUMES}/${volume}" ]]; then
+        log "Restoring ${volume} volume..."
+        docker run --rm \
+            -v "paperless_${volume}":/target \
+            -v "${TEMP_VOLUMES}/${volume}":/source \
+            alpine:latest \
+            sh -c "rm -rf /target/* && cp -r /source/* /target/ 2>/dev/null || true"
+    fi
+done
+
+# Clean up temporary directory
+rm -rf "$TEMP_VOLUMES"
+
+# Start Paperless-ngx services (database first)
+log "Starting Paperless-ngx services..."
+cd "$PAPERLESS_DATA_DIR"
+if docker-compose up -d db; then
+    log "Database service started successfully"
+else
+    error_exit "Failed to start database service"
+fi
+
+# Wait for database to be ready
+log "Waiting for database to be ready..."
+sleep 10
+
+# Restore database if backup exists
+if [[ -f "${RESTORE_DIR}/database.sql" ]]; then
+    log "Restoring database from backup..."
+    # Get database credentials from environment
+    DB_NAME=$(docker-compose -f "${PAPERLESS_DATA_DIR}/docker-compose.yml" config | grep -A 20 "db:" | grep "POSTGRES_DB:" | cut -d: -f2 | tr -d ' ')
+    DB_USER=$(docker-compose -f "${PAPERLESS_DATA_DIR}/docker-compose.yml" config | grep -A 20 "db:" | grep "POSTGRES_USER:" | cut -d: -f2 | tr -d ' ')
+    DB_PASS=$(docker-compose -f "${PAPERLESS_DATA_DIR}/docker-compose.yml" config | grep -A 20 "db:" | grep "POSTGRES_PASSWORD:" | cut -d: -f2 | tr -d ' ')
+    
+    if [[ -n "$DB_NAME" && -n "$DB_USER" && -n "$DB_PASS" ]]; then
+        # Drop and recreate database
+        docker exec paperless-db psql -U "$DB_USER" -c "DROP DATABASE IF EXISTS $DB_NAME;" || true
+        docker exec paperless-db psql -U "$DB_USER" -c "CREATE DATABASE $DB_NAME;" || \
+            error_exit "Failed to create database"
+        
+        # Restore database
+        docker exec -i paperless-db psql -U "$DB_USER" -d "$DB_NAME" < "${RESTORE_DIR}/database.sql" || \
+            error_exit "Failed to restore database"
+        
+        log "Database restored successfully"
+    else
+        log "WARNING: Could not extract database credentials, skipping database restore"
+    fi
+else
+    log "WARNING: Database backup not found, skipping database restore"
+fi
+
+# Start remaining services
+log "Starting remaining Paperless-ngx services..."
+if docker-compose up -d; then
+    log "Paperless-ngx services started successfully"
+else
+    error_exit "Failed to start Paperless-ngx services"
+fi
+
+# Wait for services to be ready
+log "Waiting for services to be ready..."
+sleep 30
+
+# Verify services are running
+if docker-compose ps | grep -q "Up"; then
+    log "Restore completed successfully"
+    log "Paperless-ngx is accessible at: http://$(hostname -I | awk '{print $1'}):8000"
+else
+    log "WARNING: Services may not be running properly. Check docker-compose logs."
+fi
+
+# Clean up restore directory
+rm -rf "$RESTORE_DIR"
+
+log "Restore process completed"
+exit 0
+
+
+

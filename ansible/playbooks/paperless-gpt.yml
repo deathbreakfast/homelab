@@ -1,0 +1,51 @@
+---
+- name: Deploy Paperless-GPT alongside existing Paperless-ngx
+  hosts: raspberry_pis
+  become: true
+  vars:
+    # Paperless-GPT configuration
+    paperless_gpt_llm_provider: "openai"  # Use OpenAI for LLM processing
+    paperless_gpt_llm_model: "gpt-4o"  # OpenAI model
+    paperless_gpt_vision_llm_provider: "openai"
+    paperless_gpt_vision_llm_model: "gpt-4o"  # OpenAI Vision model for OCR
+    paperless_gpt_auto_process: false  # Start with manual processing
+    paperless_gpt_enhanced_pdf: true  # Enable enhanced PDF features
+    paperless_gpt_create_local_pdf: false  # Disable local PDF creation initially
+    paperless_gpt_create_local_hocr: false  # Disable local hOCR creation initially
+    
+    # OpenAI API Key (should be set in vault)
+    paperless_gpt_openai_api_key: "{{ vault_openai_api_key }}"
+    
+    # Token limits for smaller models
+    paperless_gpt_token_limit: 2000
+    
+    
+  roles:
+    - ../roles/paperless_gpt
+
+  post_tasks:
+    - name: Wait for Paperless-GPT to be ready
+      uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_gpt_port }}/health"
+        method: GET
+        status_code: 200
+      register: paperless_gpt_ready
+      until: paperless_gpt_ready.status == 200
+      retries: 30
+      delay: 10
+      ignore_errors: true
+
+    - name: Display Paperless-GPT access information
+      debug:
+        msg:
+          - "Paperless-GPT has been deployed successfully!"
+          - "Access URL: http://{{ ansible_default_ipv4.address }}:{{ paperless_gpt_port }}"
+          - "LLM Provider: {{ paperless_gpt_llm_provider }} ({{ paperless_gpt_llm_model }})"
+          - "OCR Provider: llm ({{ paperless_gpt_vision_llm_provider }} - {{ paperless_gpt_vision_llm_model }})"
+          - "Auto Process: {{ paperless_gpt_auto_process }}"
+          - "Enhanced PDF: {{ paperless_gpt_enhanced_pdf }}"
+          - ""
+          - "Prerequisites:"
+          - "1. Ensure OpenAI API key is set in vault: vault_openai_api_key"
+          - "2. Verify OpenAI API access and billing is configured"
+          - "3. Tag documents in paperless with 'paperless-gpt' for processing"

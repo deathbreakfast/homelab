@@ -1,0 +1,14 @@
+---
+# Handlers for paperless-gpt role
+
+- name: restart paperless services
+  shell: sudo -u {{ ansible_user }} docker-compose restart
+  args:
+    chdir: "{{ paperless_data_dir }}"
+  become: true
+
+- name: restart paperless-gpt
+  shell: sudo -u {{ ansible_user }} docker-compose restart paperless-gpt
+  args:
+    chdir: "{{ paperless_data_dir }}"
+  become: true

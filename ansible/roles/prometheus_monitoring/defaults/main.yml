@@ -1,0 +1,45 @@
+---
+# Prometheus Monitoring Stack Configuration
+
+# Prometheus Configuration
+prometheus_enabled: true
+prometheus_port: 9090
+prometheus_data_dir: "/opt/prometheus/data"
+prometheus_config_dir: "/opt/prometheus/config"
+prometheus_retention: "15d"
+prometheus_memory_limit: "1g"
+prometheus_cpu_limit: "0.5"
+
+# Node Exporter Configuration
+node_exporter_enabled: true
+node_exporter_port: 9100
+
+# Docker Exporter Configuration
+docker_exporter_enabled: true
+docker_exporter_port: 9323
+
+# Alertmanager Configuration
+alertmanager_enabled: true
+alertmanager_port: 9093
+alertmanager_data_dir: "/opt/alertmanager/data"
+alertmanager_config_dir: "/opt/alertmanager/config"
+alertmanager_memory_limit: "512m"
+alertmanager_cpu_limit: "0.2"
+
+# Grafana Configuration (for monitoring dashboards)
+grafana_monitoring_enabled: false
+grafana_monitoring_port: 3001
+grafana_monitoring_data_dir: "/opt/grafana-monitoring/data"
+grafana_monitoring_config_dir: "/opt/grafana-monitoring/config"
+grafana_monitoring_memory_limit: "1g"
+grafana_monitoring_cpu_limit: "0.5"
+grafana_admin_user: "admin"
+grafana_admin_password: "admin123"
+grafana_alerting_enabled: true
+
+# Monitoring targets
+monitoring_targets:
+  - name: "rpi4b-01"
+    host: "192.168.0.45"
+    node_exporter_port: 9100
+    docker_exporter_port: 9323

@@ -1,0 +1,23 @@
+{% for remote in rclone_remotes %}
+[{{ remote.name }}]
+type = {{ remote.type }}
+{% if remote.type == 'drive' %}
+client_id = {{ vault_gdrive_client_id }}
+client_secret = {{ vault_gdrive_client_secret }}
+scope = drive
+token = {{ vault_gdrive_token }}
+{% elif remote.type == 'crypt' %}
+remote = {{ remote.remote }}
+password = {{ remote.password }}
+password2 = {{ remote.password2 }}
+{% elif remote.type == 's3' %}
+provider = {{ remote.provider }}
+env_auth = {{ remote.env_auth }}
+access_key_id = {{ remote.access_key_id }}
+secret_access_key = {{ remote.secret_access_key }}
+region = {{ remote.region }}
+location_constraint = {{ remote.location_constraint }}
+acl = {{ remote.acl }}
+{% endif %}
+
+{% endfor %}

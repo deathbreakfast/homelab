@@ -1,0 +1,132 @@
+#!/bin/bash
+
+# Paperless-ngx Backup Verification Script
+# This script verifies the integrity and accessibility of backups
+
+set -euo pipefail
+
+# Set rclone config path
+export RCLONE_CONFIG="/etc/rclone/rclone.conf"
+
+# Configuration
+BACKUP_BASE_DIR="{{ backup_base_dir }}"
+RCLONE_REMOTE="{{ rclone_remote }}"
+RCLONE_BACKUP_PATH="{{ rclone_backup_path }}"
+
+# Usage function
+usage() {
+    echo "Usage: $0 [backup_name]"
+    echo ""
+    echo "Arguments:"
+    echo "  backup_name    Specific backup to verify (optional)"
+    echo "                 If not provided, verifies the latest backup"
+    echo ""
+    echo "Available backups:"
+    rclone lsf "${RCLONE_REMOTE}:${RCLONE_BACKUP_PATH}/" | grep "^backup-" | sort -r
+    exit 1
+}
+
+# Logging function
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+}
+
+# Error handling
+error_exit() {
+    log "ERROR: $1"
+    exit 1
+}
+
+# Get backup name
+if [[ $# -eq 0 ]]; then
+    # Get the latest backup
+    BACKUP_NAME=$(rclone lsf "${RCLONE_REMOTE}:${RCLONE_BACKUP_PATH}/" | grep "^backup-" | sort -r | head -n1 | sed 's|/$||')
+    if [[ -z "$BACKUP_NAME" ]]; then
+        error_exit "No backups found"
+    fi
+    log "Verifying latest backup: $BACKUP_NAME"
+else
+    BACKUP_NAME="$1"
+fi
+
+log "Starting backup verification for: $BACKUP_NAME"
+
+# Check if backup exists
+if ! rclone lsf "${RCLONE_REMOTE}:${RCLONE_BACKUP_PATH}/${BACKUP_NAME}/" > /dev/null 2>&1; then
+    error_exit "Backup '$BACKUP_NAME' not found in cloud storage"
+fi
+
+# Create temporary verification directory
+VERIFY_DIR="${BACKUP_BASE_DIR}/verify-$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$VERIFY_DIR"
+
+log "Verification directory: $VERIFY_DIR"
+
+# Download backup metadata
+log "Downloading backup metadata..."
+rclone copy "${RCLONE_REMOTE}:${RCLONE_BACKUP_PATH}/${BACKUP_NAME}/backup-info.txt" "$VERIFY_DIR/" || log "WARNING: No backup-info.txt found"
+
+# Download checksums if available
+if rclone lsf "${RCLONE_REMOTE}:${RCLONE_BACKUP_PATH}/${BACKUP_NAME}/checksums.txt" > /dev/null 2>&1; then
+    log "Downloading checksums..."
+    rclone copy "${RCLONE_REMOTE}:${RCLONE_BACKUP_PATH}/${BACKUP_NAME}/checksums.txt" "$VERIFY_DIR/"
+fi
+
+# Download a small portion of the backup for verification
+log "Downloading backup tarball for verification..."
+if rclone copyto "${RCLONE_REMOTE}:${RCLONE_BACKUP_PATH}/${BACKUP_NAME}/paperless-volumes.tar.gz" "$VERIFY_DIR/paperless-volumes.tar.gz" --progress; then
+    log "Backup tarball downloaded successfully"
+    
+    # Verify tarball integrity
+    if tar -tzf "$VERIFY_DIR/paperless-volumes.tar.gz" > /dev/null 2>&1; then
+        log "✓ Backup tarball is valid and readable"
+    else
+        error_exit "✗ Backup tarball is corrupted or invalid"
+    fi
+    
+    # Check tarball size
+    TARBALL_SIZE=$(stat -c%s "$VERIFY_DIR/paperless-volumes.tar.gz")
+    log "Backup tarball size: $(numfmt --to=iec $TARBALL_SIZE)"
+    
+    # Verify checksums if available
+    if [[ -f "$VERIFY_DIR/checksums.txt" ]]; then
+        log "Verifying checksums..."
+        cd "$VERIFY_DIR"
+        if sha256sum -c checksums.txt; then
+            log "✓ Checksums verified successfully"
+        else
+            error_exit "✗ Checksum verification failed"
+        fi
+    fi
+else
+    error_exit "Failed to download backup tarball"
+fi
+
+# Display backup information
+if [[ -f "$VERIFY_DIR/backup-info.txt" ]]; then
+    log "Backup information:"
+    cat "$VERIFY_DIR/backup-info.txt" | sed 's/^/  /'
+fi
+
+# Test cloud storage connectivity
+log "Testing cloud storage connectivity..."
+if rclone lsf "${RCLONE_REMOTE}:${RCLONE_BACKUP_PATH}/" > /dev/null 2>&1; then
+    log "✓ Cloud storage connectivity verified"
+else
+    error_exit "✗ Cannot connect to cloud storage"
+fi
+
+# List all available backups
+log "Available backups in cloud storage:"
+rclone lsf "${RCLONE_REMOTE}:${RCLONE_BACKUP_PATH}/" | grep "^backup-" | sort -r | head -5 | sed 's|/$||' | sed 's/^/  /'
+
+# Clean up verification directory
+rm -rf "$VERIFY_DIR"
+
+log "✓ Backup verification completed successfully"
+log "Backup '$BACKUP_NAME' is valid and accessible"
+
+exit 0
+
+
+

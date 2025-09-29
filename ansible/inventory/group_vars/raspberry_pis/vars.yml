@@ -1,0 +1,42 @@
+---
+# Raspberry Pi specific configuration
+
+# Paperless-ngx configuration
+paperless_data_dir: "/opt/paperless"
+paperless_port: 8000
+paperless_superuser_name: "admin"
+paperless_superuser_email: "admin@example.com"
+paperless_ocr_language: "eng"
+paperless_timezone: "America/Los_Angeles"  # Adjust to your timezone
+
+# Security settings - These should be overridden with Ansible Vault in production
+paperless_secret_key: "{{ vault_paperless_secret_key | default('changeme_secret_key_change_this_in_production') }}"
+paperless_db_password: "{{ vault_paperless_db_password | default('changeme_db_password_change_this_in_production') }}"
+paperless_superuser_password: "{{ vault_paperless_superuser_password | default('changeme_admin_password_change_this_in_production') }}"
+
+# Docker configuration
+docker_packages:
+  - docker.io
+  - docker-compose
+
+# Rclone configuration (example - configure your actual cloud storage)
+rclone_remotes:
+  - name: "gdrive"
+    type: "drive"
+    client_id: "{{ vault_gdrive_client_id }}"
+    client_secret: "{{ vault_gdrive_client_secret }}"
+  - name: "gdrive-crypt"
+    type: "crypt"
+    remote: "gdrive:paperless-backup"
+    password: "{{ vault_rclone_crypt_password }}"
+    password2: "{{ vault_rclone_crypt_salt }}"
+
+# Backup configuration
+backup_base_dir: "/opt/backups/paperless"
+backup_cron_hour: "2"  # Daily at 2 AM
+backup_cron_minute: "0"
+backup_retention_days: 30
+rclone_remote: "gdrive-crypt"
+rclone_backup_path: "paperless-backup"
+backup_verify_enabled: true
+backup_verify_checksums: true

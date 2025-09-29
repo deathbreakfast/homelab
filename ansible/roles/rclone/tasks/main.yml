@@ -1,0 +1,56 @@
+---
+- name: Install rclone
+  get_url:
+    url: "https://rclone.org/install.sh"
+    dest: "/tmp/rclone_install.sh"
+    mode: '0755'
+
+- name: Run rclone installation script
+  shell: /tmp/rclone_install.sh
+  become: true
+  failed_when: false
+  register: rclone_install_result
+
+- name: Check rclone installation result
+  fail:
+    msg: "rclone installation failed"
+  when: rclone_install_result.rc != 0 and rclone_install_result.rc != 3
+
+- name: Display rclone installation status
+  debug:
+    msg: "{{ rclone_install_result.stdout_lines | last }}"
+  when: rclone_install_result.rc == 3
+
+- name: Clean up installation script
+  file:
+    path: /tmp/rclone_install.sh
+    state: absent
+
+- name: Ensure rclone config directory
+  file:
+    path: /etc/rclone
+    state: directory
+    mode: "0755"
+
+- name: Install rclone config
+  template:
+    src: rclone.conf.j2
+    dest: /etc/rclone/rclone.conf
+    mode: "0644"
+    owner: root
+    group: root
+  when: rclone_remotes is defined and rclone_remotes | length > 0
+
+- name: Verify rclone installation
+  command: rclone version
+  register: rclone_version
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Display rclone version
+  debug:
+    msg: "rclone {{ rclone_version.stdout.split('\n')[0] }} installed successfully"
+  when: rclone_version.stdout is defined and not ansible_check_mode
+
+
+

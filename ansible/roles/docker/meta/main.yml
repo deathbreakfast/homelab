@@ -1,0 +1,22 @@
+---
+galaxy_info:
+  author: Homelab
+  description: Install and configure Docker and Docker Compose
+  company: Personal
+  license: MIT
+  min_ansible_version: "2.9"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+  galaxy_tags:
+    - docker
+    - containerization
+    - infrastructure
+
+dependencies: []

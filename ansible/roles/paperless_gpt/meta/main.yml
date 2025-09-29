@@ -1,0 +1,24 @@
+---
+galaxy_info:
+  author: Sean O'Rourke
+  description: Deploy paperless-gpt alongside paperless-ngx for AI-powered document processing
+  company: Homelab
+  license: MIT
+  min_ansible_version: 2.9
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+  galaxy_tags:
+    - docker
+    - paperless
+    - ai
+    - llm
+
+dependencies:
+  - role: docker

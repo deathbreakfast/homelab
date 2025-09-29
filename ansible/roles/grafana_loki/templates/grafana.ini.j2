@@ -1,0 +1,33 @@
+[server]
+http_port = {{ grafana_port }}
+domain = localhost
+root_url = http://localhost:{{ grafana_port }}/
+
+[security]
+admin_user = {{ grafana_admin_user }}
+admin_password = {{ grafana_admin_password }}
+{% if not grafana_anonymous_access %}
+disable_gravatar = true
+{% endif %}
+
+[users]
+allow_sign_up = false
+auto_assign_org = true
+auto_assign_org_role = Viewer
+
+[log]
+mode = console
+level = info
+
+[unified_alerting]
+enabled = {{ grafana_alerting_enabled | lower }}
+{% if grafana_smtp_enabled %}
+[smtp]
+enabled = true
+host = {{ grafana_smtp_host }}
+user = {{ grafana_smtp_user }}
+password = {{ grafana_smtp_password }}
+{% endif %}
+
+[dashboards]
+default_home_dashboard_path = /var/lib/grafana/dashboards/homelab.json

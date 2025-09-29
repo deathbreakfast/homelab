@@ -1,0 +1,37 @@
+---
+- name: restart monitoring stack
+  shell: |
+    cd /home/{{ ansible_user }}
+    docker-compose -f docker-compose-monitoring.yml down
+    docker-compose -f docker-compose-monitoring.yml up -d
+  become_user: "{{ ansible_user }}"
+
+- name: restart prometheus
+  community.docker.docker_container:
+    name: prometheus
+    state: restarted
+  become_user: "{{ ansible_user }}"
+
+- name: restart alertmanager
+  community.docker.docker_container:
+    name: alertmanager
+    state: restarted
+  become_user: "{{ ansible_user }}"
+
+- name: restart grafana-monitoring
+  community.docker.docker_container:
+    name: grafana-monitoring
+    state: restarted
+  become_user: "{{ ansible_user }}"
+
+- name: restart node-exporter
+  community.docker.docker_container:
+    name: node-exporter
+    state: restarted
+  become_user: "{{ ansible_user }}"
+
+- name: restart docker-exporter
+  community.docker.docker_container:
+    name: docker-exporter
+    state: restarted
+  become_user: "{{ ansible_user }}"

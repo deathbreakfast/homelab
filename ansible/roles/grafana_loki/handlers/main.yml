@@ -1,0 +1,28 @@
+---
+- name: restart loki
+  community.docker.docker_container:
+    name: loki
+    state: restarted
+  become_user: "{{ ansible_user }}"
+  ignore_errors: true
+
+- name: restart promtail
+  community.docker.docker_container:
+    name: promtail
+    state: restarted
+  become_user: "{{ ansible_user }}"
+  ignore_errors: true
+
+- name: restart grafana
+  community.docker.docker_container:
+    name: grafana
+    state: restarted
+  become_user: "{{ ansible_user }}"
+  ignore_errors: true
+
+- name: restart logging stack
+  shell: |
+    cd /home/{{ ansible_user }}
+    docker-compose -f docker-compose-logging.yml down
+    docker-compose -f docker-compose-logging.yml up -d
+  become_user: "{{ ansible_user }}"

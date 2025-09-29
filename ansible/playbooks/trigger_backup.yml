@@ -1,0 +1,29 @@
+---
+- name: Trigger manual Paperless-ngx backup
+  hosts: raspberry_pis
+  become: true
+  vars:
+    backup_script_path: "/opt/backups/paperless/scripts/backup_paperless.sh"
+  
+  tasks:
+    - name: Check if backup script exists
+      stat:
+        path: "{{ backup_script_path }}"
+      register: backup_script_stat
+      
+    - name: Fail if backup script doesn't exist
+      fail:
+        msg: "Backup script not found at {{ backup_script_path }}. Run the backup setup playbook first."
+      when: not backup_script_stat.stat.exists
+      
+    - name: Run backup script
+      shell: "{{ backup_script_path }}"
+      become_user: pi
+      environment:
+        RCLONE_CONFIG: "/etc/rclone/rclone.conf"
+      register: backup_result
+      
+        
+    - name: Check backup status
+      debug:
+        msg: "{{ 'Backup completed successfully!' if backup_result.rc == 0 else 'Backup failed with return code: ' + backup_result.rc|string }}"

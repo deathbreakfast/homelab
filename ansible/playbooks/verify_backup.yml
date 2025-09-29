@@ -1,0 +1,46 @@
+---
+- name: Verify Paperless-ngx backup integrity
+  hosts: raspberry_pis
+  become: true
+  vars:
+    verify_script_path: "/opt/backups/paperless/scripts/verify_backup.sh"
+    backup_name: "{{ backup_to_verify | default('latest') }}"
+  
+  tasks:
+    - name: Check if verify script exists
+      stat:
+        path: "{{ verify_script_path }}"
+      register: verify_script_stat
+      
+    - name: Fail if verify script doesn't exist
+      fail:
+        msg: "Verify script not found at {{ verify_script_path }}. Run the backup setup playbook first."
+      when: not verify_script_stat.stat.exists
+      
+    - name: List available backups if no specific backup provided
+      shell: "rclone lsf gdrive-crypt:paperless-backup/ | grep '^backup-' | sort -r | head -5"
+      become_user: pi
+      environment:
+        RCLONE_CONFIG: "/etc/rclone/rclone.conf"
+      register: recent_backups
+      when: backup_name == "latest"
+      
+    - name: Display recent backups
+      debug:
+        msg: "Recent backups: {{ recent_backups.stdout_lines }}"
+      when: backup_name == "latest" and recent_backups is defined
+      
+    - name: Run verify script
+      shell: "{{ verify_script_path }}{{ ' ' + backup_name if backup_name != 'latest' else '' }}"
+      become_user: pi
+      environment:
+        RCLONE_CONFIG: "/etc/rclone/rclone.conf"
+      register: verify_result
+      
+    - name: Display verify result
+      debug:
+        var: verify_result.stdout_lines
+        
+    - name: Check verify status
+      debug:
+        msg: "{{ 'Backup verification completed successfully!' if verify_result.rc == 0 else 'Backup verification failed with return code: ' + verify_result.rc|string }}"

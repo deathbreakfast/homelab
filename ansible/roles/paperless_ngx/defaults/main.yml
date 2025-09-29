@@ -1,0 +1,31 @@
+---
+# Paperless-ngx configuration defaults
+
+# Installation directory
+paperless_data_dir: "/opt/paperless"
+
+# Docker images
+paperless_web_image: "ghcr.io/paperless-ngx/paperless-ngx:latest"
+paperless_db_image: "postgres:15"
+
+# Database configuration
+paperless_db_name: "paperless"
+paperless_db_user: "paperless"
+paperless_db_password: "{{ vault_paperless_db_password | default('changeme') }}"
+
+# Paperless configuration
+paperless_secret_key: "{{ vault_paperless_secret_key | default('changeme') }}"
+paperless_superuser_name: "admin"
+paperless_superuser_email: "admin@example.com"
+paperless_superuser_password: "{{ vault_paperless_superuser_password | default('changeme') }}"
+
+# Network configuration
+paperless_port: 8000
+paperless_host: "0.0.0.0"
+
+# OCR configuration
+paperless_ocr_language: "eng"
+paperless_ocr_languages: ["eng"]
+
+# Timezone
+paperless_timezone: "UTC"

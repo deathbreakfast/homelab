@@ -1,0 +1,8 @@
+---
+- name: Update all systems
+  hosts: all
+  become: true
+  tasks:
+    - name: Include apt update and upgrade tasks
+      include_tasks: ../roles/common/tasks/apt_update.yml
+      when: ansible_os_family == "Debian" 

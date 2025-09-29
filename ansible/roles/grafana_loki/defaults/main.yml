@@ -1,0 +1,62 @@
+---
+# Grafana Loki Stack Configuration
+
+# Loki Configuration
+loki_enabled: true
+loki_port: 3100
+loki_data_dir: "/opt/loki/data"
+loki_config_dir: "/opt/loki/config"
+loki_retention_period: "744h"  # 31 days
+loki_max_cache_fresh_period: "10m"
+loki_ingester_max_chunk_age: "1h"
+loki_ingester_chunk_idle_period: "30m"
+loki_ingester_max_transfer_retries: 0
+
+# Promtail Configuration
+promtail_enabled: true
+promtail_config_dir: "/opt/promtail/config"
+promtail_log_dirs:
+  - "/var/log"
+  - "/var/lib/docker/containers"
+promtail_docker_logs: true
+promtail_system_logs: true
+promtail_journal_logs: true
+
+# Grafana Configuration
+grafana_enabled: true
+grafana_port: 3000
+grafana_data_dir: "/opt/grafana/data"
+grafana_config_dir: "/opt/grafana/config"
+grafana_admin_user: "admin"
+grafana_admin_password: "{{ vault_grafana_admin_password | default('admin') }}"
+grafana_anonymous_access: false
+
+# Network Configuration
+logging_network_name: "logging"
+loki_host: "loki"
+promtail_host: "promtail"
+grafana_host: "grafana"
+
+# Resource Limits (for Raspberry Pi optimization)
+loki_memory_limit: "512m"
+loki_cpu_limit: "0.5"
+promtail_memory_limit: "256m"
+promtail_cpu_limit: "0.25"
+grafana_memory_limit: "512m"
+grafana_cpu_limit: "0.5"
+
+# Log Retention
+log_retention_days: 31
+log_compression_enabled: true
+
+# Alerting
+grafana_alerting_enabled: true
+grafana_smtp_enabled: false
+grafana_smtp_host: ""
+grafana_smtp_user: ""
+grafana_smtp_password: ""
+
+# Dashboard Configuration
+grafana_dashboards_enabled: true
+grafana_dashboard_auto_refresh: "5s"
+grafana_dashboard_time_range: "1h"

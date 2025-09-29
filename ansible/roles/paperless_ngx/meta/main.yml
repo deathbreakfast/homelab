@@ -1,0 +1,27 @@
+---
+galaxy_info:
+  author: Homelab
+  description: Deploy Paperless-ngx document management system
+  company: Personal
+  license: MIT
+  min_ansible_version: "2.9"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+  galaxy_tags:
+    - paperless
+    - document-management
+    - docker
+    - ocr
+
+dependencies:
+  - role: docker
+
+
+

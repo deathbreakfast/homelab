@@ -1,0 +1,51 @@
+---
+- name: Deploy Paperless-ngx on Raspberry Pi
+  hosts: raspberry_pis
+  become: true
+  vars:
+    paperless_data_dir: "/opt/paperless"
+    paperless_port: 8000
+    paperless_superuser_name: "admin"
+    paperless_superuser_email: "admin@example.com"
+    # These should be overridden with vault variables in production
+    paperless_secret_key: "{{ vault_paperless_secret_key | default('changeme_secret_key_change_this') }}"
+    paperless_db_password: "{{ vault_paperless_db_password | default('changeme_db_password_change_this') }}"
+    paperless_superuser_password: "{{ vault_paperless_superuser_password | default('changeme_admin_password_change_this') }}"
+    
+    # Paperless-GPT configuration
+    paperless_gpt_llm_provider: "openai"  # Use OpenAI for LLM processing
+    paperless_gpt_llm_model: "gpt-4o"  # OpenAI model
+    paperless_gpt_ocr_provider: "openai"
+    paperless_gpt_ocr_model: "gpt-4o"  # OpenAI Vision model for OCR
+    paperless_gpt_auto_process: false  # Start with manual processing
+    paperless_gpt_enhanced_pdf: true  # Enable enhanced PDF features
+  roles:
+    - ../roles/docker
+    - ../roles/paperless_ngx
+    - ../roles/paperless_gpt
+
+  post_tasks:
+    - name: Wait for Paperless to be ready
+      uri:
+        url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_port }}/api/"
+        method: GET
+        status_code: 200
+      register: paperless_ready
+      until: paperless_ready.status == 200
+      retries: 30
+      delay: 10
+
+    - name: Display Paperless and Paperless-GPT access information
+      debug:
+        msg:
+          - "Paperless-ngx has been deployed successfully!"
+          - "Paperless-ngx URL: http://{{ ansible_default_ipv4.address }}:{{ paperless_port }}"
+          - "Paperless-GPT URL: http://{{ ansible_default_ipv4.address }}:{{ paperless_gpt_port }}"
+          - "Admin username: {{ paperless_superuser_name }}"
+          - "Admin email: {{ paperless_superuser_email }}"
+          - "Admin password: {{ paperless_superuser_password }}"
+          - "LLM Provider: {{ paperless_gpt_llm_provider }} ({{ paperless_gpt_llm_model }})"
+          - "OCR Provider: {{ paperless_gpt_ocr_provider }} ({{ paperless_gpt_ocr_model }})"
+          - "Auto Process: {{ paperless_gpt_auto_process }}"
+          - "IMPORTANT: Change the default passwords after first login!"
+          - "IMPORTANT: Ensure OpenAI API key is set in vault (vault_openai_api_key)!"

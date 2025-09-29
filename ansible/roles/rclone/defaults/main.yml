@@ -1,0 +1,25 @@
+---
+# Rclone role configuration defaults
+
+# Installation settings
+rclone_install_method: "script"  # script or package
+
+# Configuration settings
+rclone_config_dir: "/home/{{ ansible_user }}/.config/rclone"
+
+# Remote configurations (to be defined in group_vars or host_vars)
+rclone_remotes: []
+# Example:
+# rclone_remotes:
+#   - name: "gdrive"
+#     type: "drive"
+#     client_id: "your_client_id"
+#     client_secret: "your_client_secret"
+#   - name: "gdrive-crypt"
+#     type: "crypt"
+#     remote: "gdrive:paperless-backup"
+#     password: "{{ vault_rclone_crypt_password }}"
+#     password2: "{{ vault_rclone_crypt_salt }}"
+
+
+

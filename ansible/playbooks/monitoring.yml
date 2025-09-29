@@ -1,0 +1,24 @@
+---
+- name: Deploy comprehensive monitoring stack
+  hosts: rpi4b-01
+  become: true
+  roles:
+    - prometheus_monitoring
+
+- name: Configure monitoring on Raspberry Pis
+  hosts: rpi4b-01
+  become: true
+  roles:
+    - prometheus_monitoring
+
+- name: Configure monitoring on desktop computers
+  hosts: desktops
+  become: true
+  roles:
+    - prometheus_monitoring
+
+- name: Configure monitoring on servers
+  hosts: servers
+  become: true
+  roles:
+    - prometheus_monitoring

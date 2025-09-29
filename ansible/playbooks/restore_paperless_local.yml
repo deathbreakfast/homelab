@@ -1,0 +1,244 @@
+---
+- name: Restore Paperless-ngx from local backup
+  hosts: raspberry_pis
+  become: true
+  vars:
+    # Backup configuration
+    backup_base_dir: "/opt/backups/paperless"
+    paperless_data_dir: "/opt/paperless"
+    
+    # Restore configuration
+    restore_backup_path: ""  # Full path to backup directory, e.g., /opt/backups/paperless/backup-20250929_020013
+    restore_force: false     # Force restore even if services are running
+    
+  tasks:
+    - name: Check if backup path is provided
+      fail:
+        msg: "Please provide backup path using: ansible-playbook -e 'restore_backup_path=/path/to/backup' playbooks/restore_paperless_local.yml"
+      when: restore_backup_path == ""
+
+    - name: Check if backup directory exists
+      stat:
+        path: "{{ restore_backup_path }}"
+      register: backup_dir_stat
+
+    - name: Fail if backup directory doesn't exist
+      fail:
+        msg: "Backup directory '{{ restore_backup_path }}' does not exist"
+      when: not backup_dir_stat.stat.exists
+
+    - name: List available local backups
+      find:
+        paths: "{{ backup_base_dir }}"
+        patterns: "backup-*"
+        file_type: directory
+      register: local_backups
+
+    - name: Display available local backups
+      debug:
+        msg:
+          - "Available local backups:"
+          - "{{ local_backups.files | map(attribute='path') | list }}"
+      when: local_backups.files | length > 0
+
+    - name: Check if Paperless-ngx is running
+      shell: docker-compose -f "{{ paperless_data_dir }}/docker-compose.yml" ps | grep -q "Up"
+      register: paperless_running
+      failed_when: false
+      ignore_errors: true
+
+    - name: Warn about running services
+      debug:
+        msg: "WARNING: Paperless-ngx services are running. They will be stopped during restore."
+      when: paperless_running.rc == 0 and not restore_force
+
+    - name: Fail if services are running and not forced
+      fail:
+        msg: "Paperless-ngx services are running. Use -e 'restore_force=true' to force restore."
+      when: paperless_running.rc == 0 and not restore_force
+
+    - name: Create restore directory
+      file:
+        path: "{{ backup_base_dir }}/restore-{{ ansible_date_time.iso8601_basic_short }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0755'
+      register: restore_dir
+
+    - name: Copy backup files to restore directory
+      copy:
+        src: "{{ restore_backup_path }}/"
+        dest: "{{ restore_dir.path }}/"
+        remote_src: yes
+      register: copy_result
+
+    - name: Verify backup integrity
+      shell: |
+        cd "{{ restore_dir.path }}"
+        if [[ -f checksums.txt ]]; then
+          sha256sum -c checksums.txt
+        else
+          echo "No checksums file found, skipping verification"
+        fi
+      register: checksum_result
+      ignore_errors: true
+
+    - name: Warn about checksum failure
+      debug:
+        msg: "WARNING: Backup integrity check failed, but continuing with restore"
+      when: checksum_result.rc != 0
+
+    - name: Stop Paperless-ngx services
+      shell: |
+        cd "{{ paperless_data_dir }}"
+        docker-compose down
+      ignore_errors: true
+
+    - name: Create backup of current data (safety measure)
+      shell: |
+        CURRENT_BACKUP="{{ backup_base_dir }}/current-backup-{{ ansible_date_time.iso8601_basic_short }}"
+        mkdir -p "$CURRENT_BACKUP"
+        if [[ -d "{{ paperless_data_dir }}/data" ]] || [[ -d "{{ paperless_data_dir }}/media" ]]; then
+          cp -r "{{ paperless_data_dir }}"/* "$CURRENT_BACKUP/" 2>/dev/null || true
+          echo "Current data backed up to: $CURRENT_BACKUP"
+        fi
+      register: current_backup_result
+      ignore_errors: true
+
+    - name: Display current backup location
+      debug:
+        msg: "Current data backed up to: {{ current_backup_result.stdout_lines[-1] }}"
+      when: current_backup_result.stdout_lines is defined and current_backup_result.stdout_lines | length > 0
+
+    - name: Extract backup volumes
+      shell: |
+        TEMP_VOLUMES="/tmp/paperless-restore-volumes"
+        mkdir -p "$TEMP_VOLUMES"
+        
+        for volume in data media export static; do
+          if [[ -f "{{ restore_dir.path }}/${volume}.tar.gz" ]]; then
+            echo "Extracting ${volume} volume..."
+            mkdir -p "${TEMP_VOLUMES}/${volume}"
+            tar xzf "{{ restore_dir.path }}/${volume}.tar.gz" -C "${TEMP_VOLUMES}/${volume}"
+          else
+            echo "WARNING: ${volume}.tar.gz not found in backup"
+          fi
+        done
+      register: extract_result
+
+    - name: Restore Docker volumes
+      shell: |
+        TEMP_VOLUMES="/tmp/paperless-restore-volumes"
+        
+        for volume in data media export static; do
+          if [[ -d "${TEMP_VOLUMES}/${volume}" ]]; then
+            echo "Restoring ${volume} volume..."
+            docker run --rm \
+              -v "paperless_${volume}":/target \
+              -v "${TEMP_VOLUMES}/${volume}":/source \
+              alpine:latest \
+              sh -c "rm -rf /target/* && cp -r /source/* /target/ 2>/dev/null || true"
+          fi
+        done
+        
+        rm -rf "$TEMP_VOLUMES"
+      register: restore_volumes_result
+
+    - name: Start database service
+      shell: |
+        cd "{{ paperless_data_dir }}"
+        docker-compose up -d db
+      register: start_db_result
+
+    - name: Wait for database to be ready
+      pause:
+        seconds: 10
+
+    - name: Get database credentials
+      shell: |
+        docker-compose -f "{{ paperless_data_dir }}/docker-compose.yml" config | grep -A 20 "db:" | grep "POSTGRES_DB:" | cut -d: -f2 | tr -d ' '
+      register: db_name
+
+    - name: Get database user
+      shell: |
+        docker-compose -f "{{ paperless_data_dir }}/docker-compose.yml" config | grep -A 20 "db:" | grep "POSTGRES_USER:" | cut -d: -f2 | tr -d ' '
+      register: db_user
+
+    - name: Get database password
+      shell: |
+        docker-compose -f "{{ paperless_data_dir }}/docker-compose.yml" config | grep -A 20 "db:" | grep "POSTGRES_PASSWORD:" | cut -d: -f2 | tr -d ' '
+      register: db_password
+
+    - name: Restore database
+      shell: |
+        if [[ -f "{{ restore_dir.path }}/database.sql" ]]; then
+          echo "Restoring database from backup..."
+          
+          # Drop and recreate database
+          docker exec paperless-db psql -U "{{ db_user.stdout }}" -c "DROP DATABASE IF EXISTS {{ db_name.stdout }};" || true
+          docker exec paperless-db psql -U "{{ db_user.stdout }}" -c "CREATE DATABASE {{ db_name.stdout }};" || exit 1
+          
+          # Restore database
+          docker exec -i paperless-db psql -U "{{ db_user.stdout }}" -d "{{ db_name.stdout }}" < "{{ restore_dir.path }}/database.sql" || exit 1
+          
+          echo "Database restored successfully"
+        else
+          echo "WARNING: Database backup not found, skipping database restore"
+        fi
+      register: restore_db_result
+      ignore_errors: true
+
+    - name: Start all Paperless-ngx services
+      shell: |
+        cd "{{ paperless_data_dir }}"
+        docker-compose up -d
+      register: start_services_result
+
+    - name: Wait for services to be ready
+      pause:
+        seconds: 30
+
+    - name: Verify services are running
+      shell: docker-compose -f "{{ paperless_data_dir }}/docker-compose.yml" ps | grep -q "Up"
+      register: services_running
+      failed_when: false
+
+    - name: Clean up restore directory
+      file:
+        path: "{{ restore_dir.path }}"
+        state: absent
+
+    - name: Display restore results
+      debug:
+        msg:
+          - "Restore completed!"
+          - "Paperless-ngx should be accessible at: http://{{ ansible_default_ipv4.address }}:8000"
+          - ""
+          - "Restore Summary:"
+          - "- Volumes restored: {{ restore_volumes_result.rc == 0 }}"
+          - "- Database restored: {{ restore_db_result.rc == 0 }}"
+          - "- Services running: {{ services_running.rc == 0 }}"
+          - ""
+          - "Next steps:"
+          - "1. Verify you can access paperless-ngx web interface"
+          - "2. Check that your documents and metadata are restored"
+          - "3. If paperless-gpt was running, restart it to reconnect"
+
+  post_tasks:
+    - name: Restart paperless-gpt if it exists
+      shell: |
+        cd "{{ paperless_data_dir }}"
+        if docker-compose ps | grep -q "paperless-gpt"; then
+          docker-compose restart paperless-gpt
+          echo "Paperless-GPT restarted"
+        else
+          echo "Paperless-GPT not found, skipping restart"
+        fi
+      register: restart_gpt_result
+      ignore_errors: true
+
+    - name: Display paperless-gpt status
+      debug:
+        msg: "{{ restart_gpt_result.stdout }}"
+      when: restart_gpt_result.stdout is defined

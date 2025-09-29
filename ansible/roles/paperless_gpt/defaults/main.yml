@@ -1,0 +1,46 @@
+---
+# Paperless-GPT configuration defaults
+
+# Installation directory (same as paperless-ngx)
+paperless_gpt_data_dir: "{{ paperless_data_dir }}"
+
+# Docker image
+paperless_gpt_image: "ghcr.io/icereed/paperless-gpt:latest"
+
+# Network configuration
+paperless_gpt_port: 8080
+paperless_gpt_host: "0.0.0.0"
+
+# LLM Configuration
+paperless_gpt_llm_provider: "openai"  # Options: "ollama", "openai"
+paperless_gpt_llm_model: "gpt-4o"  # Default OpenAI model
+paperless_gpt_ollama_host: "http://host.docker.internal:11434"
+paperless_gpt_openai_api_key: "{{ vault_openai_api_key | default('') }}"
+
+# Paperless-ngx API configuration
+paperless_gpt_paperless_host: "http://webserver:8000"
+paperless_gpt_paperless_api_token: "{{ vault_paperless_gpt_api_token | default('') }}"
+
+# OCR Configuration
+paperless_gpt_vision_llm_provider: "openai"  # Options: "openai", "ollama"
+paperless_gpt_vision_llm_model: "gpt-4o"  # OpenAI Vision model for OCR
+paperless_gpt_ocr_language: "eng"
+paperless_gpt_ocr_limit_pages: 10
+
+# Processing Configuration
+paperless_gpt_token_limit: 2000
+paperless_gpt_auto_process: false
+paperless_gpt_enhanced_pdf: false
+paperless_gpt_create_local_pdf: false
+paperless_gpt_create_local_hocr: false
+paperless_gpt_pdf_replace: false
+
+# Local storage paths (if enabled)
+paperless_gpt_local_pdf_path: "{{ paperless_data_dir }}/paperless-gpt/pdf"
+paperless_gpt_local_hocr_path: "{{ paperless_data_dir }}/paperless-gpt/hocr"
+
+# Timezone
+paperless_gpt_timezone: "{{ paperless_timezone }}"
+
+# Logging
+paperless_gpt_log_level: "INFO"

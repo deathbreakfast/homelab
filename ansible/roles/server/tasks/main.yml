@@ -1,0 +1,22 @@
+---
+- name: Install server specific packages
+  apt:
+    name:
+      - nginx
+      - ufw
+      - fail2ban
+    state: present
+  become: true
+  when: ansible_os_family == "Debian"
+
+- name: Enable and configure UFW
+  ufw:
+    state: enabled
+    policy: deny
+  become: true
+
+- name: Allow SSH through UFW
+  ufw:
+    rule: allow
+    port: ssh
+  become: true 

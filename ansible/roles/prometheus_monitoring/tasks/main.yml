@@ -1,0 +1,113 @@
+---
+- name: Create Prometheus directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  loop:
+    - "{{ prometheus_data_dir }}"
+    - "{{ prometheus_config_dir }}"
+    - "{{ alertmanager_data_dir }}"
+    - "{{ alertmanager_config_dir }}"
+    - "{{ grafana_monitoring_data_dir }}"
+    - "{{ grafana_monitoring_config_dir }}"
+  when: prometheus_enabled or alertmanager_enabled or grafana_monitoring_enabled
+
+- name: Create Prometheus configuration
+  template:
+    src: prometheus.yml.j2
+    dest: "{{ prometheus_config_dir }}/prometheus.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  when: prometheus_enabled
+
+- name: Create Alertmanager configuration
+  template:
+    src: alertmanager.yml.j2
+    dest: "{{ alertmanager_config_dir }}/alertmanager.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  when: alertmanager_enabled
+
+- name: Create Grafana monitoring configuration
+  template:
+    src: grafana-monitoring.ini.j2
+    dest: "{{ grafana_monitoring_config_dir }}/grafana.ini"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  when: grafana_monitoring_enabled
+
+- name: Create Docker Compose for monitoring stack
+  template:
+    src: docker-compose-monitoring.yml.j2
+    dest: "/home/{{ ansible_user }}/docker-compose-monitoring.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  when: prometheus_enabled or alertmanager_enabled or grafana_monitoring_enabled
+
+- name: Create monitoring network
+  community.docker.docker_network:
+    name: monitoring
+    state: present
+  become_user: "{{ ansible_user }}"
+  when: prometheus_enabled or alertmanager_enabled or grafana_monitoring_enabled
+
+- name: Start monitoring stack
+  shell: |
+    cd /home/{{ ansible_user }}
+    docker-compose -f docker-compose-monitoring.yml pull
+    docker-compose -f docker-compose-monitoring.yml up -d
+  become_user: "{{ ansible_user }}"
+  when: prometheus_enabled or alertmanager_enabled or grafana_monitoring_enabled
+
+- name: Wait for services to be ready
+  wait_for:
+    port: "{{ item.port }}"
+    host: "{{ item.host }}"
+    delay: 10
+    timeout: 60
+  loop:
+    - { port: "{{ prometheus_port }}", host: "localhost" }
+    - { port: "{{ alertmanager_port }}", host: "localhost" }
+    - { port: "{{ grafana_monitoring_port }}", host: "localhost" }
+  when: prometheus_enabled or alertmanager_enabled or grafana_monitoring_enabled
+
+- name: Configure Prometheus data source in main Grafana
+  uri:
+    url: "http://localhost:3000/api/datasources"
+    method: POST
+    body_format: json
+    body:
+      name: "Prometheus"
+      type: "prometheus"
+      url: "http://prometheus:{{ prometheus_port }}"
+      access: "proxy"
+      isDefault: false
+    user: "{{ grafana_admin_user }}"
+    password: "{{ grafana_admin_password }}"
+    status_code: 200
+  ignore_errors: true
+  when: prometheus_enabled
+
+- name: Configure Loki data source in main Grafana
+  uri:
+    url: "http://localhost:3000/api/datasources"
+    method: POST
+    body_format: json
+    body:
+      name: "Loki"
+      type: "loki"
+      url: "http://loki:3100"
+      access: "proxy"
+      isDefault: true
+    user: "{{ grafana_admin_user }}"
+    password: "{{ grafana_admin_password }}"
+    status_code: 200
+  ignore_errors: true
+  when: prometheus_enabled

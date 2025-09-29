@@ -1,0 +1,44 @@
+---
+- name: Install Docker
+  package:
+    name: docker.io
+    state: present
+  become: true
+
+- name: Install Docker Compose
+  package:
+    name: docker-compose
+    state: present
+  become: true
+
+- name: Start and enable Docker service
+  systemd:
+    name: docker
+    enabled: yes
+    state: started
+  become: true
+
+- name: Add user to docker group
+  user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: yes
+  become: true
+
+- name: Ensure docker group has correct permissions
+  file:
+    path: /var/run/docker.sock
+    owner: root
+    group: docker
+    mode: '0664'
+  become: true
+
+- name: Test Docker access
+  shell: docker ps
+  become_user: "{{ ansible_user }}"
+  ignore_errors: true
+  register: docker_test
+
+- name: Display Docker status
+  debug:
+    msg: "Docker is {{ 'working' if docker_test.rc == 0 else 'needs user session restart' }}"

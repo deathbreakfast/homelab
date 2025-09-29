@@ -1,0 +1,12 @@
+[raspberry_pis]
+# Example: rpi1 ansible_host=192.168.1.10 ansible_user=pi
+rpi4b-01 ansible_host=192.168.0.45 ansible_user=pi ansible_ssh_private_key_file=~/.ssh/homelab_key
+
+[desktop_computers]
+# Example: desktop1 ansible_host=192.168.1.20 ansible_user=admin
+
+[servers]
+# Example: server1 ansible_host=192.168.1.30 ansible_user=admin
+
+[all:vars]
+ansible_python_interpreter=/usr/bin/python3 

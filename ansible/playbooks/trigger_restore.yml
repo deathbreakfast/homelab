@@ -1,0 +1,55 @@
+---
+- name: Trigger Paperless-ngx restore from backup
+  hosts: raspberry_pis
+  become: true
+  vars:
+    restore_script_path: "/opt/backups/paperless/scripts/restore_paperless.sh"
+    backup_name: "{{ backup_to_restore | default('') }}"
+    force_restore: "{{ force | default(false) }}"
+  
+  tasks:
+    - name: Validate backup name provided
+      fail:
+        msg: "Please provide backup_to_restore variable. Example: -e backup_to_restore=backup-20240101_020000"
+      when: backup_name == ""
+      
+    - name: Check if restore script exists
+      stat:
+        path: "{{ restore_script_path }}"
+      register: restore_script_stat
+      
+    - name: Fail if restore script doesn't exist
+      fail:
+        msg: "Restore script not found at {{ restore_script_path }}. Run the backup setup playbook first."
+      when: not restore_script_stat.stat.exists
+      
+    - name: List available backups
+      shell: "rclone lsf gdrive-crypt:paperless-backup/ | grep '^backup-' | sort -r"
+      become_user: pi
+      environment:
+        RCLONE_CONFIG: "/etc/rclone/rclone.conf"
+      register: available_backups
+      when: backup_name == ""
+      
+    - name: Display available backups
+      debug:
+        msg: "Available backups: {{ available_backups.stdout_lines }}"
+      when: backup_name == "" and available_backups is defined
+      
+    - name: Run restore script
+      shell: "{{ restore_script_path }} {{ backup_name }}{{ ' --force' if force_restore else '' }}"
+      become_user: pi
+      environment:
+        RCLONE_CONFIG: "/etc/rclone/rclone.conf"
+      register: restore_result
+      when: backup_name != ""
+      
+    - name: Display restore result
+      debug:
+        var: restore_result.stdout_lines
+      when: restore_result is defined
+        
+    - name: Check restore status
+      debug:
+        msg: "{{ 'Restore completed successfully!' if restore_result.rc == 0 else 'Restore failed with return code: ' + restore_result.rc|string }}"
+      when: restore_result is defined

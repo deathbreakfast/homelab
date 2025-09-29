@@ -1,0 +1,48 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "alert_rules.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:{{ alertmanager_port }}
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:{{ prometheus_port }}']
+
+  # Node Exporter for system metrics
+  - job_name: 'node-exporter'
+    static_configs:
+{% for target in monitoring_targets %}
+      - targets: ['{{ target.host }}:{{ target.node_exporter_port }}']
+        labels:
+          instance: '{{ target.name }}'
+          job: 'node-exporter'
+{% endfor %}
+
+  # Docker metrics
+  - job_name: 'docker'
+    static_configs:
+{% for target in monitoring_targets %}
+      - targets: ['{{ target.host }}:{{ target.docker_exporter_port }}']
+        labels:
+          instance: '{{ target.name }}'
+          job: 'docker'
+{% endfor %}
+
+  # Loki metrics (if available)
+  - job_name: 'loki'
+    static_configs:
+{% for target in monitoring_targets %}
+      - targets: ['{{ target.host }}:3100']
+        labels:
+          instance: '{{ target.name }}'
+          job: 'loki'
+{% endfor %}

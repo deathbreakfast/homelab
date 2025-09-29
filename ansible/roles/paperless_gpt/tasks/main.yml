@@ -1,0 +1,89 @@
+---
+# Paperless-GPT deployment tasks
+
+- name: Create paperless-gpt directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  loop:
+    - "{{ paperless_gpt_local_pdf_path }}"
+    - "{{ paperless_gpt_local_hocr_path }}"
+  when: paperless_gpt_create_local_pdf or paperless_gpt_create_local_hocr
+
+- name: Create paperless-gpt .env file
+  template:
+    src: paperless-gpt.env.j2
+    dest: "{{ paperless_gpt_data_dir }}/paperless-gpt.env"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+
+- name: Check if paperless docker-compose.yml exists
+  stat:
+    path: "{{ paperless_data_dir }}/docker-compose.yml"
+  register: paperless_compose_exists
+
+- name: Fail if paperless docker-compose.yml doesn't exist
+  fail:
+    msg: "Paperless docker-compose.yml not found at {{ paperless_data_dir }}/docker-compose.yml. Please deploy paperless-ngx first."
+  when: not paperless_compose_exists.stat.exists
+
+- name: Check if backup exists
+  stat:
+    path: "{{ paperless_data_dir }}/docker-compose.yml.backup"
+  register: backup_exists
+
+- name: Backup original docker-compose.yml
+  copy:
+    src: "{{ paperless_data_dir }}/docker-compose.yml"
+    dest: "{{ paperless_data_dir }}/docker-compose.yml.backup"
+    remote_src: yes
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  when: not backup_exists.stat.exists
+
+- name: Update paperless docker-compose.yml to include paperless-gpt
+  template:
+    src: docker-compose-with-gpt.yml.j2
+    dest: "{{ paperless_data_dir }}/docker-compose.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  notify: restart paperless services
+
+- name: Pull paperless-gpt image
+  shell: sudo -u {{ ansible_user }} docker-compose pull paperless-gpt
+  args:
+    chdir: "{{ paperless_data_dir }}"
+  become: true
+
+- name: Start paperless-gpt service
+  shell: sudo -u {{ ansible_user }} docker-compose up -d paperless-gpt
+  args:
+    chdir: "{{ paperless_data_dir }}"
+  become: true
+
+- name: Wait for paperless-gpt to be ready
+  uri:
+    url: "http://{{ ansible_default_ipv4.address }}:{{ paperless_gpt_port }}/health"
+    method: GET
+    status_code: 200
+  register: paperless_gpt_ready
+  until: paperless_gpt_ready.status == 200
+  retries: 30
+  delay: 10
+  ignore_errors: true
+
+- name: Display paperless-gpt access information
+  debug:
+    msg:
+      - "Paperless-GPT has been deployed successfully!"
+      - "Access URL: http://{{ ansible_default_ipv4.address }}:{{ paperless_gpt_port }}"
+      - "LLM Provider: {{ paperless_gpt_llm_provider }}"
+      - "LLM Model: {{ paperless_gpt_llm_model }}"
+      - "OCR Provider: llm ({{ paperless_gpt_vision_llm_provider }} - {{ paperless_gpt_vision_llm_model }})"
+      - "Auto Process: {{ paperless_gpt_auto_process }}"

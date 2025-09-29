@@ -1,0 +1,10 @@
+---
+- name: Install desktop specific packages
+  apt:
+    name:
+      - ubuntu-desktop-minimal
+      - firefox
+      - gnome-terminal
+    state: present
+  become: true
+  when: ansible_os_family == "Debian" 

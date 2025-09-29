@@ -1,0 +1,45 @@
+---
+- name: Deploy centralized logging stack
+  hosts: all
+  become: true
+  roles:
+    - grafana_loki
+
+- name: Configure logging on Raspberry Pis
+  hosts: raspberry_pis
+  become: true
+  vars:
+    loki_enabled: true
+    promtail_enabled: true
+    grafana_enabled: true
+    promtail_docker_logs: true
+    promtail_system_logs: true
+    promtail_journal_logs: true
+  roles:
+    - grafana_loki
+
+- name: Configure logging on desktop computers
+  hosts: desktop_computers
+  become: true
+  vars:
+    loki_enabled: true
+    promtail_enabled: true
+    grafana_enabled: false  # Only one Grafana instance needed
+    promtail_docker_logs: true
+    promtail_system_logs: true
+    promtail_journal_logs: true
+  roles:
+    - grafana_loki
+
+- name: Configure logging on servers
+  hosts: servers
+  become: true
+  vars:
+    loki_enabled: true
+    promtail_enabled: true
+    grafana_enabled: false  # Only one Grafana instance needed
+    promtail_docker_logs: true
+    promtail_system_logs: true
+    promtail_journal_logs: true
+  roles:
+    - grafana_loki

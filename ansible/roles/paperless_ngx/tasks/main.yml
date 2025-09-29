@@ -1,0 +1,50 @@
+---
+# Docker installation is handled by the docker role dependency
+
+- name: Create Paperless directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  loop:
+    - "{{ paperless_data_dir }}/data"
+    - "{{ paperless_data_dir }}/media"
+    - "{{ paperless_data_dir }}/export"
+    - "{{ paperless_data_dir }}/static"
+
+- name: Create Paperless docker-compose.yml
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ paperless_data_dir }}/docker-compose.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+
+- name: Create Paperless .env file
+  template:
+    src: paperless.env.j2
+    dest: "{{ paperless_data_dir }}/.env"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+
+- name: Pull Paperless images
+  shell: sudo -u {{ ansible_user }} docker-compose pull
+  args:
+    chdir: "{{ paperless_data_dir }}"
+  become: true
+
+- name: Start Paperless services
+  shell: sudo -u {{ ansible_user }} docker-compose up -d
+  args:
+    chdir: "{{ paperless_data_dir }}"
+  become: true
+
+- name: Wait for services to be ready
+  wait_for:
+    port: "{{ paperless_port }}"
+    host: "{{ ansible_default_ipv4.address }}"
+    delay: 10
+    timeout: 300

@@ -1,0 +1,48 @@
+---
+- name: Set up Paperless-ngx backup system
+  hosts: raspberry_pis
+  become: true
+  vars:
+    # Backup configuration
+    backup_base_dir: "/opt/backups/paperless"
+    paperless_data_dir: "/opt/paperless"
+    backup_retention_days: 30
+    
+    # Cron schedule (daily at 2 AM)
+    backup_cron_hour: "2"
+    backup_cron_minute: "0"
+    
+    # Rclone configuration
+    rclone_remote: "gdrive-crypt"
+    rclone_backup_path: "paperless-backup"
+    backup_verify_enabled: true
+    backup_verify_checksums: true
+    
+    # Notification settings (disabled by default)
+    backup_notifications:
+      enabled: false
+    
+  roles:
+    - rclone
+    - paperless_backup
+
+  post_tasks:
+    - name: Display backup configuration information
+      debug:
+        msg:
+          - "Backup system configured successfully!"
+          - "Backup directory: {{ backup_base_dir }}"
+          - "Rclone remote: {{ rclone_remote }}"
+          - "Backup schedule: Daily at {{ backup_cron_hour }}:{{ backup_cron_minute }}"
+          - "Retention: {{ backup_retention_days }} days"
+          - ""
+          - "Manual backup commands:"
+          - "  Run backup: {{ backup_base_dir }}/scripts/backup_paperless.sh"
+          - "  Verify backup: {{ backup_base_dir }}/scripts/verify_backup.sh"
+          - "  Restore backup: {{ backup_base_dir }}/scripts/restore_paperless.sh <backup_name>"
+          - ""
+          - "IMPORTANT: Configure your cloud storage credentials in group_vars/raspberry_pis.yml"
+          - "IMPORTANT: Set up encryption passwords using Ansible Vault"
+
+
+

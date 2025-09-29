@@ -1,0 +1,15 @@
+{{ backup_base_dir }}/logs/*.log {
+    daily
+    missingok
+    rotate {{ backup_log_retention_days }}
+    compress
+    delaycompress
+    notifempty
+    create 644 {{ ansible_user }} {{ ansible_user }}
+    postrotate
+        # No need to reload any services for log files
+    endscript
+}
+
+
+

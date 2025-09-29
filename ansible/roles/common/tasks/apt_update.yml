@@ -1,0 +1,23 @@
+---
+- name: Clean apt lists
+  shell: |
+    rm -rf /var/lib/apt/lists/*
+  become: true
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600  # Consider cache valid for 1 hour
+  become: true
+
+- name: Upgrade all apt packages
+  apt:
+    upgrade: dist
+    force_apt_get: yes  # Use apt-get instead of apt for better stability
+  become: true
+
+- name: Remove dependencies that are no longer required
+  apt:
+    autoremove: yes
+    autoclean: yes
+  become: true 

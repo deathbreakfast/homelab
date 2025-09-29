@@ -1,0 +1,129 @@
+#!/bin/bash
+
+# Paperless-ngx Backup Script
+# This script creates encrypted backups of Paperless-ngx data and syncs to cloud storage
+
+set -euo pipefail
+
+# Set rclone config path
+export RCLONE_CONFIG="/etc/rclone/rclone.conf"
+
+# Configuration
+BACKUP_BASE_DIR="{{ backup_base_dir }}"
+PAPERLESS_DATA_DIR="{{ paperless_data_dir }}"
+RCLONE_REMOTE="{{ rclone_remote }}"
+RCLONE_BACKUP_PATH="{{ rclone_backup_path }}"
+RETENTION_DAYS="{{ backup_retention_days }}"
+LOG_FILE="${BACKUP_BASE_DIR}/logs/backup-$(date +%Y%m%d_%H%M%S).log"
+
+# Logging function
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
+
+# Error handling
+error_exit() {
+    log "ERROR: $1"
+    exit 1
+}
+
+# Start backup
+log "Starting Paperless-ngx backup process"
+
+# Check if Paperless-ngx is running
+if ! docker-compose -f "${PAPERLESS_DATA_DIR}/docker-compose.yml" ps | grep -q "Up"; then
+    log "WARNING: Paperless-ngx services may not be running"
+fi
+
+# Create backup directory with timestamp
+BACKUP_DIR="${BACKUP_BASE_DIR}/backup-$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$BACKUP_DIR"
+
+log "Backup directory: $BACKUP_DIR"
+
+# Export Docker volumes
+log "Exporting Docker volumes..."
+docker run --rm \
+    -v paperless_data:/data \
+    -v paperless_media:/media \
+    -v paperless_export:/export \
+    -v paperless_static:/static \
+    -v "${BACKUP_DIR}":/backup \
+    alpine:latest \
+    sh -c 'cd /data && tar czf /backup/data.tar.gz . && cd /media && tar czf /backup/media.tar.gz . && cd /export && tar czf /backup/export.tar.gz . && cd /static && tar czf /backup/static.tar.gz .' || \
+    error_exit "Failed to export Docker volumes"
+
+# Backup PostgreSQL database
+log "Backing up PostgreSQL database..."
+if docker-compose -f "${PAPERLESS_DATA_DIR}/docker-compose.yml" ps | grep -q "paperless-db.*Up"; then
+    # Get database credentials from environment
+    DB_NAME=$(docker-compose -f "${PAPERLESS_DATA_DIR}/docker-compose.yml" config | grep -A 20 "db:" | grep "POSTGRES_DB:" | cut -d: -f2 | tr -d ' ')
+    DB_USER=$(docker-compose -f "${PAPERLESS_DATA_DIR}/docker-compose.yml" config | grep -A 20 "db:" | grep "POSTGRES_USER:" | cut -d: -f2 | tr -d ' ')
+    DB_PASS=$(docker-compose -f "${PAPERLESS_DATA_DIR}/docker-compose.yml" config | grep -A 20 "db:" | grep "POSTGRES_PASSWORD:" | cut -d: -f2 | tr -d ' ')
+    
+    if [[ -n "$DB_NAME" && -n "$DB_USER" && -n "$DB_PASS" ]]; then
+        docker exec paperless-db pg_dump -U "$DB_USER" -d "$DB_NAME" --no-password > "${BACKUP_DIR}/database.sql" || \
+            error_exit "Failed to backup database"
+        log "Database backup completed"
+    else
+        log "WARNING: Could not extract database credentials, skipping database backup"
+    fi
+else
+    log "WARNING: Database container not running, skipping database backup"
+fi
+
+# Create metadata file
+log "Creating backup metadata..."
+cat > "${BACKUP_DIR}/backup-info.txt" << EOF
+Backup Date: $(date)
+Paperless Data Dir: ${PAPERLESS_DATA_DIR}
+Docker Compose Version: $(docker-compose -f "${PAPERLESS_DATA_DIR}/docker-compose.yml" version --short 2>/dev/null || echo "unknown")
+System Info: $(uname -a)
+Backup Size: $(du -sh "${BACKUP_DIR}" | cut -f1)
+EOF
+
+# Create checksum file
+if [[ "{{ backup_verify_checksums }}" == "true" ]]; then
+    log "Creating checksums..."
+    cd "$BACKUP_DIR"
+    find . -type f -name "*.tar.gz" -exec sha256sum {} \; > checksums.txt
+fi
+
+# Upload to cloud storage
+log "Uploading backup to cloud storage..."
+if rclone copy "$BACKUP_DIR" "${RCLONE_REMOTE}:${RCLONE_BACKUP_PATH}/$(basename "$BACKUP_DIR")" --progress --log-level INFO; then
+    log "Backup uploaded successfully"
+else
+    error_exit "Failed to upload backup to cloud storage"
+fi
+
+# Verify upload
+log "Verifying backup upload..."
+if rclone check "$BACKUP_DIR" "${RCLONE_REMOTE}:${RCLONE_BACKUP_PATH}/$(basename "$BACKUP_DIR")" --one-way; then
+    log "Backup verification successful"
+else
+    log "WARNING: Backup verification failed"
+fi
+
+# Clean up local backup (optional - keep for a few days)
+if [[ "$RETENTION_DAYS" -gt 0 ]]; then
+    log "Cleaning up old local backups (keeping ${RETENTION_DAYS} days)..."
+    find "$BACKUP_BASE_DIR" -name "backup-*" -type d -mtime +${RETENTION_DAYS} -exec rm -rf {} \; 2>/dev/null || true
+fi
+
+# Clean up old log files
+find "${BACKUP_BASE_DIR}/logs" -name "backup-*.log" -mtime +{{ backup_log_retention_days }} -delete 2>/dev/null || true
+
+log "Backup process completed successfully"
+
+# Send notification if configured
+{% if backup_notifications.enabled %}
+if [[ -f "${BACKUP_BASE_DIR}/scripts/backup_notify.sh" ]]; then
+    "${BACKUP_BASE_DIR}/scripts/backup_notify.sh" "success" "Paperless backup completed successfully" "$LOG_FILE"
+fi
+{% endif %}
+
+exit 0
+
+
+

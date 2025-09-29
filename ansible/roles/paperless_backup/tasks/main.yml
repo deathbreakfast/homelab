@@ -1,0 +1,64 @@
+---
+- name: Create backup directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  loop:
+    - "{{ backup_base_dir }}"
+    - "{{ backup_base_dir }}/scripts"
+    - "{{ backup_base_dir }}/logs"
+
+- name: Create backup script
+  template:
+    src: backup_paperless.sh.j2
+    dest: "{{ backup_base_dir }}/scripts/backup_paperless.sh"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Create restore script
+  template:
+    src: restore_paperless.sh.j2
+    dest: "{{ backup_base_dir }}/scripts/restore_paperless.sh"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Create backup verification script
+  template:
+    src: verify_backup.sh.j2
+    dest: "{{ backup_base_dir }}/scripts/verify_backup.sh"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Create logrotate configuration for backup logs
+  template:
+    src: paperless-backup.logrotate
+    dest: "/etc/logrotate.d/paperless-backup"
+    owner: root
+    group: root
+    mode: '0644'
+  become: true
+
+- name: Add cron job for automated backups
+  cron:
+    name: "Paperless-ngx backup"
+    minute: "{{ backup_cron_minute }}"
+    hour: "{{ backup_cron_hour }}"
+    day: "{{ backup_cron_day }}"
+    job: "{{ backup_base_dir }}/scripts/backup_paperless.sh >> {{ backup_base_dir }}/logs/backup.log 2>&1"
+    user: "{{ ansible_user }}"
+
+- name: Create backup notification script
+  template:
+    src: backup_notify.sh.j2
+    dest: "{{ backup_base_dir }}/scripts/backup_notify.sh"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  when: backup_notifications.enabled | default(false)
+

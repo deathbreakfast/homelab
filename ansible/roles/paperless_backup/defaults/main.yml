@@ -1,0 +1,48 @@
+---
+# Paperless backup configuration defaults
+
+# Backup settings
+backup_base_dir: "/opt/backups/paperless"
+paperless_data_dir: "/opt/paperless"
+backup_retention_days: 30
+
+# Cron schedule (daily at 2 AM by default)
+backup_cron_minute: "0"
+backup_cron_hour: "2"
+backup_cron_day: "*"
+
+# Rclone settings
+rclone_remote: "gdrive-crypt"  # Should match remote name in rclone config
+rclone_backup_path: "paperless-backup"
+
+# Backup options
+backup_exclude_patterns:
+  - "*.tmp"
+  - "*.log"
+  - ".DS_Store"
+  - "Thumbs.db"
+
+# Verification settings
+backup_verify_enabled: true
+backup_verify_checksums: true
+
+# Notification settings
+backup_notifications:
+  enabled: false
+  email:
+    smtp_server: ""
+    smtp_port: 587
+    username: ""
+    password: ""
+    to_address: ""
+    from_address: ""
+  webhook:
+    url: ""
+    method: "POST"
+
+# Logging settings
+backup_log_level: "INFO"
+backup_log_retention_days: 90
+
+
+

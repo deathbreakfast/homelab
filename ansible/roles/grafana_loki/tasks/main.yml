@@ -1,0 +1,138 @@
+---
+- name: Create Loki directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  loop:
+    - "{{ loki_data_dir }}"
+    - "{{ loki_config_dir }}"
+    - "{{ loki_data_dir }}/chunks"
+    - "{{ loki_data_dir }}/rules"
+    - "{{ loki_data_dir }}/compactor"
+  when: loki_enabled
+
+- name: Set Loki data directory permissions
+  file:
+    path: "{{ loki_data_dir }}"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0775'
+    recurse: yes
+  when: loki_enabled
+
+- name: Set /opt directory permissions for pi user
+  file:
+    path: /opt
+    owner: root
+    group: "{{ ansible_user }}"
+    mode: '0775'
+  become: true
+  when: loki_enabled
+
+- name: Create Promtail directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  loop:
+    - "{{ promtail_config_dir }}"
+  when: promtail_enabled
+
+- name: Create Grafana directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  loop:
+    - "{{ grafana_data_dir }}"
+    - "{{ grafana_config_dir }}"
+  when: grafana_enabled
+
+- name: Create Loki configuration
+  template:
+    src: loki-config.yml.j2
+    dest: "{{ loki_config_dir }}/loki-config.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  when: loki_enabled
+  notify: restart loki
+
+- name: Create Promtail configuration
+  template:
+    src: promtail-config.yml.j2
+    dest: "{{ promtail_config_dir }}/promtail-config.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  when: promtail_enabled
+  notify: restart promtail
+
+- name: Create Grafana configuration
+  template:
+    src: grafana.ini.j2
+    dest: "{{ grafana_config_dir }}/grafana.ini"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  when: grafana_enabled
+  notify: restart grafana
+
+- name: Create Docker Compose for logging stack
+  template:
+    src: docker-compose-logging.yml.j2
+    dest: "/home/{{ ansible_user }}/docker-compose-logging.yml"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+  notify: restart logging stack
+
+- name: Create logging network
+  community.docker.docker_network:
+    name: "{{ logging_network_name }}"
+    state: present
+  become_user: "{{ ansible_user }}"
+  ignore_errors: true
+
+- name: Start logging stack
+  shell: |
+    cd /home/{{ ansible_user }}
+    docker-compose -f docker-compose-logging.yml pull
+    docker-compose -f docker-compose-logging.yml up -d
+  become_user: "{{ ansible_user }}"
+  when: loki_enabled or promtail_enabled or grafana_enabled
+
+- name: Wait for services to be ready
+  wait_for:
+    port: "{{ item.port }}"
+    host: "{{ item.host }}"
+    delay: 10
+    timeout: 60
+  loop:
+    - { port: "{{ loki_port }}", host: "localhost" }
+    - { port: "{{ grafana_port }}", host: "localhost" }
+  when: loki_enabled and grafana_enabled
+
+- name: Configure Grafana data source
+  uri:
+    url: "http://localhost:{{ grafana_port }}/api/datasources"
+    method: POST
+    body_format: json
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Basic {{ (grafana_admin_user + ':' + grafana_admin_password) | b64encode }}"
+    body:
+      name: "Loki"
+      type: "loki"
+      url: "http://{{ loki_host }}:{{ loki_port }}"
+      access: "proxy"
+      isDefault: true
+  when: grafana_enabled and loki_enabled
+  ignore_errors: true

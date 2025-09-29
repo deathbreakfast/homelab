@@ -1,0 +1,17 @@
+---
+- name: Install Raspberry Pi specific packages
+  apt:
+    name:
+      - raspi-config
+      - rpi-update
+    state: present
+  become: true
+
+- name: Enable required services
+  systemd:
+    name: "{{ item }}"
+    enabled: yes
+    state: started
+  with_items:
+    - ssh
+  become: true 
