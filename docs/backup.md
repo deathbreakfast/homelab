@@ -8,12 +8,87 @@ The backup role provides:
 
 - Encrypted backups using `rclone crypt`
 - Automated scheduling with cron
+- **Automatic retention management** - keeps only N most recent backups
 - Helper scripts for backup, verification, and restore
 - Support for any rclone-supported cloud provider
 - Integrity checks using SHA-256 checksums
 - Log rotation and retention controls
 
 Backups are staged under `/opt/backups/paperless` before being uploaded to cloud storage.
+
+## Backup Retention Policy
+
+The backup system automatically manages backup retention to prevent storage from filling up indefinitely.
+
+### How Retention Works
+
+**Count-Based Retention (Primary)**:
+- By default, the system keeps only the **3 most recent backups**
+- Applies to **both local and cloud storage**
+- Older backups are automatically deleted from all locations
+- Runs daily at 4:00 AM (2 hours after backup completes)
+
+**Time-Based Retention (Safety Net)**:
+- Local backups older than **7 days** are also cleaned up
+- This is a secondary safety mechanism
+- Helps handle edge cases where count-based cleanup fails
+
+### Retention Schedule
+
+```
+02:00 AM - Backup runs (creates new backup)
+04:00 AM - Cleanup runs (deletes old backups)
+```
+
+This ensures the backup completes before cleanup starts, maintaining at least one successful backup at all times.
+
+### Configuring Retention
+
+To change the retention policy, edit `ansible/inventory/group_vars/raspberry_pis/vars.yml`:
+
+```yaml
+# Retention policy
+backup_retention_count: 3       # Keep only the 3 most recent backups
+backup_retention_days: 7        # Also clean up local backups older than 7 days
+
+# Cleanup schedule
+cleanup_cron_hour: "4"          # Daily at 4 AM
+cleanup_cron_minute: "0"
+cleanup_cron_day: "*"
+```
+
+**Recommendations**:
+- **Minimum retention**: Keep at least 3 backups for redundancy
+- **Daily backups**: With 3 backups, you have up to 3 days of recovery points
+- **Weekly backups**: If backing up weekly, increase to 4-6 for monthly coverage
+- **Storage constraints**: Reduce to 2 backups minimum if storage is very limited
+
+### Manual Cleanup
+
+You can also run cleanup manually:
+
+```bash
+# Dry run (see what would be deleted without actually deleting)
+ansible raspberry_pis -m shell -a "/opt/backups/paperless/scripts/cleanup_old_backups.sh --dry-run"
+
+# Actual cleanup
+ansible raspberry_pis -m shell -a "/opt/backups/paperless/scripts/cleanup_old_backups.sh"
+
+# Verbose output
+ansible raspberry_pis -m shell -a "/opt/backups/paperless/scripts/cleanup_old_backups.sh --dry-run --verbose"
+```
+
+### What Gets Deleted
+
+The cleanup script removes:
+- ✗ Backup directories from `/opt/backups/paperless/backup-YYYYMMDD_HHMMSS/`
+- ✗ Backup directories from cloud storage (`gdrive-crypt:paperless-backup/backup-*`)
+- ✗ Entries from the cloud backup registry JSON
+
+The script **always keeps**:
+- ✓ The N most recent backups (default: 3)
+- ✓ Currently running backup (never deleted)
+- ✓ All backup logs (cleaned separately with 30-day retention)
 
 ## Inventory Configuration
 
@@ -69,11 +144,26 @@ rclone_remotes:
 
 # Backup configuration
 backup_base_dir: "/opt/backups/paperless"
+
+# Backup schedule
 backup_cron_hour: "2"
 backup_cron_minute: "0"
-backup_retention_days: 30
+backup_cron_day: "*"
+
+# Cleanup schedule (runs after backup completes)
+cleanup_cron_hour: "4"
+cleanup_cron_minute: "0"
+cleanup_cron_day: "*"
+
+# Retention policy
+backup_retention_count: 3       # Keep only the 3 most recent backups
+backup_retention_days: 7        # Also clean up local backups older than 7 days
+
+# Cloud storage
 rclone_remote: "gdrive-crypt"
 rclone_backup_path: "paperless-backup"
+
+# Verification
 backup_verify_enabled: true
 backup_verify_checksums: true
 ```

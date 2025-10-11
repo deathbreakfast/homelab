@@ -89,6 +89,7 @@ The project includes an automated backup system for Paperless-ngx with:
 
 - **Encrypted cloud storage** using rclone crypt
 - **Automated daily backups** with cron scheduling
+- **Automatic retention management** - keeps only 3 most recent backups
 - **Backup verification** and integrity checks
 - **Restore functionality** with safety measures
 - **Multiple cloud providers** supported

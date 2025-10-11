@@ -1,0 +1,495 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Homelab Software Monitoring",
+    "tags": ["homelab", "software", "applications"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Docker Containers Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "probe_success{job=\"paperless\"}",
+            "legendFormat": "Paperless - {{instance}}",
+            "datasource": "Prometheus"
+          },
+          {
+            "expr": "probe_success{job=\"paperless-gpt\"}",
+            "legendFormat": "Paperless GPT - {{instance}}",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Paperless Availability",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "probe_success{job=\"paperless\"}",
+            "legendFormat": "Paperless - {{instance}}",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Paperless GPT Availability",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "probe_success{job=\"paperless-gpt\"}",
+            "legendFormat": "Paperless GPT - {{instance}}",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "Paperless Error Logs",
+        "type": "logs",
+        "targets": [
+          {
+            "expr": "{container_name=~\"paperless.*\"} |= \"ERROR\"",
+            "datasource": "Loki"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "list",
+              "inspect": false
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Paperless GPT Error Logs",
+        "type": "logs",
+        "targets": [
+          {
+            "expr": "{container_name=\"paperless-gpt\"} |= \"ERROR\"",
+            "datasource": "Loki"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "list",
+              "inspect": false
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 12,
+        "title": "Paperless GPT All Logs",
+        "type": "logs",
+        "targets": [
+          {
+            "expr": "{container_name=\"paperless-gpt\"}",
+            "datasource": "Loki"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "list",
+              "inspect": false
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 40}
+      },
+      {
+        "id": 6,
+        "title": "Application Response Times",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "probe_duration_seconds{job=\"paperless\"}",
+            "legendFormat": "Paperless Response Time",
+            "datasource": "Prometheus"
+          },
+          {
+            "expr": "probe_duration_seconds{job=\"paperless-gpt\"}",
+            "legendFormat": "Paperless GPT Response Time",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 7,
+        "title": "Application Health Status",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "probe_success{job=\"paperless\"}",
+            "legendFormat": "Paperless - {{instance}}",
+            "datasource": "Prometheus"
+          },
+          {
+            "expr": "probe_success{job=\"paperless-gpt\"}",
+            "legendFormat": "Paperless GPT - {{instance}}",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "min": 0,
+            "max": 1
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      },
+      {
+        "id": 8,
+        "title": "Local Backups Table",
+        "type": "table",
+        "targets": [
+          {
+            "refId": "A",
+            "expr": "backup_local_size_bytes / 1024 / 1024 / 1024",
+            "format": "table",
+            "instant": true,
+            "datasource": "Prometheus"
+          },
+          {
+            "refId": "B",
+            "expr": "backup_local_timestamp * 1000",
+            "format": "table",
+            "instant": true,
+            "datasource": "Prometheus"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "merge",
+            "options": {}
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true,
+                "job": true,
+                "Job": true,
+                "__name__": true,
+                "instance": true
+              },
+              "indexByName": {
+                "name": 0,
+                "type": 1,
+                "Value #A": 2,
+                "Value #B": 3
+              },
+              "renameByName": {
+                "name": "Backup Name",
+                "type": "Type",
+                "Value #A": "Size (GB)",
+                "Value #B": "Backup Time"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "auto",
+              "inspect": false,
+              "align": "auto"
+            },
+            "unit": "short"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Size (GB)"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "none"
+                },
+                {
+                  "id": "decimals",
+                  "value": 2
+                },
+                {
+                  "id": "custom.displayName",
+                  "value": "Size (GB)"
+                },
+                {
+                  "id": "custom.width",
+                  "value": 120
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Backup Time"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "dateTimeAsIso"
+                },
+                {
+                  "id": "custom.displayName",
+                  "value": "Backup Time"
+                },
+                {
+                  "id": "custom.width",
+                  "value": 180
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Backup Name"
+              },
+              "properties": [
+                {
+                  "id": "custom.displayName",
+                  "value": "Backup Name"
+                },
+                {
+                  "id": "custom.width",
+                  "value": 220
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Type"
+              },
+              "properties": [
+                {
+                  "id": "custom.displayName",
+                  "value": "Type"
+                },
+                {
+                  "id": "custom.width",
+                  "value": 100
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "desc": true,
+              "displayName": "Backup Time"
+            }
+          ]
+        },
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24}
+      },
+      {
+        "id": 9,
+        "title": "Cloud Backups Table",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "backup_cloud_size_bytes / 1024 / 1024 / 1024",
+            "format": "table",
+            "instant": true,
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "list",
+              "inspect": false
+            },
+            "unit": "decbytes",
+            "min": 0
+          }
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "desc": true,
+              "displayName": "Value"
+            }
+          ]
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+      },
+      {
+        "id": 10,
+        "title": "Backup Health Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "backup_local_success",
+            "legendFormat": "Local Backup Success",
+            "datasource": "Prometheus"
+          },
+          {
+            "expr": "backup_cloud_success",
+            "legendFormat": "Cloud Backup Success",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32}
+      },
+      {
+        "id": 11,
+        "title": "Backup Age (Hours)",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "backup_latest_local_age_hours",
+            "legendFormat": "Latest Local Backup Age",
+            "datasource": "Prometheus"
+          },
+          {
+            "expr": "backup_latest_cloud_age_hours",
+            "legendFormat": "Latest Cloud Backup Age",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "h"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32}
+      }
+    ]
+  }
+}

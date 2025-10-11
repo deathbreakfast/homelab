@@ -28,14 +28,13 @@ scrape_configs:
           tag:
         source: attrs
     - regex:
-        expression: (?P<container_name>(?:[^|]*))\|
+        expression: (?P<container_name>[^|]+)\|
     - timestamp:
         format: RFC3339Nano
         source: time
     - labels:
         stream:
         container_name:
-        tag:
     - output:
         source: output
 {% endif %}
@@ -70,78 +69,8 @@ scrape_configs:
   relabel_configs:
     - source_labels: ['__journal__systemd_unit']
       target_label: 'unit'
-    - source_labels: ['__journal__boot_id']
-      target_label: 'boot_id'
-    - source_labels: ['__journal__transport']
-      target_label: 'transport'
     - source_labels: ['__journal__syslog_identifier']
-      target_label: 'syslog_identifier'
-    - source_labels: ['__journal__syslog_pid']
-      target_label: 'syslog_pid'
-    - source_labels: ['__journal__syslog_facility']
-      target_label: 'syslog_facility'
-    - source_labels: ['__journal__syslog_priority']
-      target_label: 'syslog_priority'
-    - source_labels: ['__journal__syslog_timestamp']
-      target_label: 'syslog_timestamp'
-    - source_labels: ['__journal__syslog_msgid']
-      target_label: 'syslog_msgid'
-    - source_labels: ['__journal__syslog_comm']
-      target_label: 'syslog_comm'
-    - source_labels: ['__journal__syslog_pid']
-      target_label: 'syslog_pid'
-    - source_labels: ['__journal__syslog_uid']
-      target_label: 'syslog_uid'
-    - source_labels: ['__journal__syslog_gid']
-      target_label: 'syslog_gid'
-    - source_labels: ['__journal__syslog_slice']
-      target_label: 'syslog_slice'
-    - source_labels: ['__journal__syslog_user_unit']
-      target_label: 'syslog_user_unit'
-    - source_labels: ['__journal__syslog_user_slice']
-      target_label: 'syslog_user_slice'
-    - source_labels: ['__journal__syslog_session_id']
-      target_label: 'syslog_session_id'
-    - source_labels: ['__journal__syslog_code_file']
-      target_label: 'syslog_code_file'
-    - source_labels: ['__journal__syslog_code_line']
-      target_label: 'syslog_code_line'
-    - source_labels: ['__journal__syslog_code_func']
-      target_label: 'syslog_code_func'
-    - source_labels: ['__journal__syslog_errno']
-      target_label: 'syslog_errno'
-    - source_labels: ['__journal__syslog_syslog_facility']
-      target_label: 'syslog_syslog_facility'
-    - source_labels: ['__journal__syslog_syslog_priority']
-      target_label: 'syslog_syslog_priority'
-    - source_labels: ['__journal__syslog_syslog_timestamp']
-      target_label: 'syslog_syslog_timestamp'
-    - source_labels: ['__journal__syslog_syslog_msgid']
-      target_label: 'syslog_syslog_msgid'
-    - source_labels: ['__journal__syslog_syslog_comm']
-      target_label: 'syslog_syslog_comm'
-    - source_labels: ['__journal__syslog_syslog_pid']
-      target_label: 'syslog_syslog_pid'
-    - source_labels: ['__journal__syslog_syslog_uid']
-      target_label: 'syslog_syslog_uid'
-    - source_labels: ['__journal__syslog_syslog_gid']
-      target_label: 'syslog_syslog_gid'
-    - source_labels: ['__journal__syslog_syslog_slice']
-      target_label: 'syslog_syslog_slice'
-    - source_labels: ['__journal__syslog_syslog_user_unit']
-      target_label: 'syslog_syslog_user_unit'
-    - source_labels: ['__journal__syslog_syslog_user_slice']
-      target_label: 'syslog_syslog_user_slice'
-    - source_labels: ['__journal__syslog_syslog_session_id']
-      target_label: 'syslog_syslog_session_id'
-    - source_labels: ['__journal__syslog_syslog_code_file']
-      target_label: 'syslog_syslog_code_file'
-    - source_labels: ['__journal__syslog_syslog_code_line']
-      target_label: 'syslog_syslog_code_line'
-    - source_labels: ['__journal__syslog_syslog_code_func']
-      target_label: 'syslog_syslog_code_func'
-    - source_labels: ['__journal__syslog_syslog_errno']
-      target_label: 'syslog_syslog_errno'
+      target_label: 'service'
 {% endif %}
 
 {% for log_dir in promtail_log_dirs %}

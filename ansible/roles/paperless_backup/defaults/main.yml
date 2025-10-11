@@ -4,12 +4,20 @@
 # Backup settings
 backup_base_dir: "/opt/backups/paperless"
 paperless_data_dir: "/opt/paperless"
-backup_retention_days: 30
+
+# Retention settings
+backup_retention_count: 3          # Keep only N most recent backups (default: 3)
+backup_retention_days: 7           # Also clean up local backups older than N days (safety net)
 
 # Cron schedule (daily at 2 AM by default)
 backup_cron_minute: "0"
 backup_cron_hour: "2"
 backup_cron_day: "*"
+
+# Cleanup schedule (runs after backup completes)
+cleanup_cron_minute: "0"
+cleanup_cron_hour: "4"
+cleanup_cron_day: "*"
 
 # Rclone settings
 rclone_remote: "gdrive-crypt"  # Should match remote name in rclone config

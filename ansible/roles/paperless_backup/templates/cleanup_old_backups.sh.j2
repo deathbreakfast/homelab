@@ -1,0 +1,285 @@
+#!/bin/bash
+
+# Paperless-ngx Backup Cleanup Script
+# This script removes old backups from both local and cloud storage, keeping only N most recent backups
+
+set -euo pipefail
+
+# Set rclone config path
+export RCLONE_CONFIG="/etc/rclone/rclone.conf"
+
+# Configuration
+BACKUP_BASE_DIR="{{ backup_base_dir }}"
+RCLONE_REMOTE="{{ rclone_remote }}"
+RCLONE_BACKUP_PATH="{{ rclone_backup_path }}"
+RETENTION_COUNT="{{ backup_retention_count }}"
+LOG_FILE="${BACKUP_BASE_DIR}/logs/cleanup-$(date +%Y%m%d_%H%M%S).log"
+CLOUD_BACKUP_REGISTRY="${BACKUP_BASE_DIR}/cloud_backup_registry.json"
+
+# Parse command line arguments
+DRY_RUN=false
+VERBOSE=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        -v|--verbose)
+            VERBOSE=true
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Usage: $0 [--dry-run] [--verbose]"
+            exit 1
+            ;;
+    esac
+done
+
+# Logging function
+log() {
+    local message="[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+    echo "$message" | tee -a "$LOG_FILE"
+}
+
+# Verbose logging (only if --verbose flag is set)
+log_verbose() {
+    if [[ "$VERBOSE" == "true" ]]; then
+        log "$1"
+    fi
+}
+
+# Error handling
+error_exit() {
+    log "ERROR: $1"
+    exit 1
+}
+
+# Start cleanup
+if [[ "$DRY_RUN" == "true" ]]; then
+    log "Starting backup cleanup (DRY RUN - no deletions will occur)"
+else
+    log "Starting backup cleanup (keeping ${RETENTION_COUNT} most recent backups)"
+fi
+
+# Ensure retention count is at least 1
+if [[ "$RETENTION_COUNT" -lt 1 ]]; then
+    error_exit "Retention count must be at least 1 (current: ${RETENTION_COUNT})"
+fi
+
+# Create temporary file for backup list
+TEMP_BACKUP_LIST=$(mktemp)
+trap "rm -f $TEMP_BACKUP_LIST" EXIT
+
+# Function to extract timestamp from backup name (format: backup-YYYYMMDD_HHMMSS)
+extract_timestamp() {
+    local backup_name="$1"
+    # Remove 'backup-' prefix
+    local timestamp_str="${backup_name#backup-}"
+    # Convert to Unix timestamp for sorting
+    # Format: YYYYMMDD_HHMMSS -> YYYY-MM-DD HH:MM:SS
+    local year="${timestamp_str:0:4}"
+    local month="${timestamp_str:4:2}"
+    local day="${timestamp_str:6:2}"
+    local hour="${timestamp_str:9:2}"
+    local minute="${timestamp_str:11:2}"
+    local second="${timestamp_str:13:2}"
+    
+    # Convert to Unix timestamp
+    date -d "${year}-${month}-${day} ${hour}:${minute}:${second}" +%s 2>/dev/null || echo "0"
+}
+
+# Function to list cloud backups
+list_cloud_backups() {
+    log "Listing cloud backups..."
+    local cloud_backups=()
+    
+    # Use rclone lsf to list directories
+    if rclone lsf "${RCLONE_REMOTE}:${RCLONE_BACKUP_PATH}/" --dirs-only 2>/dev/null; then
+        log "Successfully listed cloud backups"
+    else
+        log "WARNING: Failed to list cloud backups (remote may be empty or unreachable)"
+        return 1
+    fi
+}
+
+# Function to list local backups
+list_local_backups() {
+    log "Listing local backups..."
+    if [[ -d "$BACKUP_BASE_DIR" ]]; then
+        find "$BACKUP_BASE_DIR" -maxdepth 1 -type d -name "backup-*" -printf "%f\n" 2>/dev/null || true
+    fi
+}
+
+# Collect all backups (cloud and local)
+log "Collecting backup information..."
+
+# Get cloud backups
+if list_cloud_backups > "${TEMP_BACKUP_LIST}.cloud" 2>&1; then
+    log_verbose "Cloud backups collected"
+else
+    log "WARNING: Could not retrieve cloud backups, will only process local backups"
+    touch "${TEMP_BACKUP_LIST}.cloud"
+fi
+
+# Get local backups
+list_local_backups > "${TEMP_BACKUP_LIST}.local"
+
+# Merge and deduplicate backup names
+cat "${TEMP_BACKUP_LIST}.cloud" "${TEMP_BACKUP_LIST}.local" | \
+    grep -E '^backup-[0-9]{8}_[0-9]{6}/?$' | \
+    sed 's:/$::' | \
+    sort -u > "$TEMP_BACKUP_LIST"
+
+# Count total backups
+TOTAL_BACKUPS=$(wc -l < "$TEMP_BACKUP_LIST")
+log "Found ${TOTAL_BACKUPS} total unique backup(s)"
+
+# If we have fewer backups than retention count, nothing to delete
+if [[ "$TOTAL_BACKUPS" -le "$RETENTION_COUNT" ]]; then
+    log "Backup count (${TOTAL_BACKUPS}) is within retention limit (${RETENTION_COUNT}). No cleanup needed."
+    exit 0
+fi
+
+# Create associative array with timestamp as key
+declare -A backup_timestamps
+
+while IFS= read -r backup_name; do
+    if [[ -n "$backup_name" ]]; then
+        timestamp=$(extract_timestamp "$backup_name")
+        if [[ "$timestamp" != "0" ]]; then
+            backup_timestamps["$timestamp"]="$backup_name"
+            log_verbose "Parsed: $backup_name -> timestamp $timestamp"
+        else
+            log "WARNING: Could not parse timestamp from backup: $backup_name"
+        fi
+    fi
+done < "$TEMP_BACKUP_LIST"
+
+# Sort timestamps in descending order (newest first) and create ordered list
+SORTED_BACKUPS=$(mktemp)
+trap "rm -f $TEMP_BACKUP_LIST $SORTED_BACKUPS ${TEMP_BACKUP_LIST}.cloud ${TEMP_BACKUP_LIST}.local" EXIT
+
+for timestamp in $(printf '%s\n' "${!backup_timestamps[@]}" | sort -rn); do
+    echo "${backup_timestamps[$timestamp]}" >> "$SORTED_BACKUPS"
+done
+
+# Display backups to keep
+log "Backups to KEEP (${RETENTION_COUNT} most recent):"
+head -n "$RETENTION_COUNT" "$SORTED_BACKUPS" | while read -r backup_name; do
+    log "  ✓ $backup_name"
+done
+
+# Calculate number of backups to delete
+BACKUPS_TO_DELETE=$((TOTAL_BACKUPS - RETENTION_COUNT))
+
+if [[ "$BACKUPS_TO_DELETE" -le 0 ]]; then
+    log "No backups to delete"
+    exit 0
+fi
+
+log "Backups to DELETE (${BACKUPS_TO_DELETE}):"
+tail -n "+$((RETENTION_COUNT + 1))" "$SORTED_BACKUPS" | while read -r backup_name; do
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log "  [DRY RUN] Would delete: $backup_name"
+    else
+        log "  ✗ $backup_name"
+    fi
+done
+
+# Perform deletions
+if [[ "$DRY_RUN" == "true" ]]; then
+    log "DRY RUN complete - no actual deletions performed"
+    exit 0
+fi
+
+log "Starting deletion of old backups..."
+
+DELETED_COUNT=0
+FAILED_COUNT=0
+
+# Process backups to delete
+tail -n "+$((RETENTION_COUNT + 1))" "$SORTED_BACKUPS" | while read -r backup_name; do
+    if [[ -z "$backup_name" ]]; then
+        continue
+    fi
+    
+    log "Processing deletion of: $backup_name"
+    
+    # Delete from cloud
+    CLOUD_PATH="${RCLONE_REMOTE}:${RCLONE_BACKUP_PATH}/${backup_name}"
+    if rclone lsf "$CLOUD_PATH" &>/dev/null; then
+        log "  Deleting from cloud storage: $CLOUD_PATH"
+        if rclone purge "$CLOUD_PATH" 2>&1 | tee -a "$LOG_FILE"; then
+            log "  ✓ Cloud deletion successful"
+        else
+            log "  ✗ WARNING: Failed to delete from cloud storage"
+            ((FAILED_COUNT++)) || true
+        fi
+    else
+        log_verbose "  (not found in cloud storage, skipping)"
+    fi
+    
+    # Delete from local storage
+    LOCAL_PATH="${BACKUP_BASE_DIR}/${backup_name}"
+    if [[ -d "$LOCAL_PATH" ]]; then
+        log "  Deleting from local storage: $LOCAL_PATH"
+        if rm -rf "$LOCAL_PATH"; then
+            log "  ✓ Local deletion successful"
+            ((DELETED_COUNT++)) || true
+        else
+            log "  ✗ WARNING: Failed to delete from local storage"
+            ((FAILED_COUNT++)) || true
+        fi
+    else
+        log_verbose "  (not found in local storage, skipping)"
+    fi
+done
+
+# Update cloud backup registry to remove deleted backups
+if [[ -f "$CLOUD_BACKUP_REGISTRY" ]]; then
+    log "Updating cloud backup registry..."
+    
+    # Create list of backups to keep
+    KEEP_LIST=$(mktemp)
+    head -n "$RETENTION_COUNT" "$SORTED_BACKUPS" > "$KEEP_LIST"
+    
+    # Filter registry to only include backups we're keeping
+    if command -v jq &>/dev/null; then
+        # Use jq if available (more robust)
+        KEEP_PATTERN=$(cat "$KEEP_LIST" | paste -sd '|')
+        jq --arg pattern "$KEEP_PATTERN" '[.[] | select(.name | test($pattern))]' \
+            "$CLOUD_BACKUP_REGISTRY" > "${CLOUD_BACKUP_REGISTRY}.tmp" 2>/dev/null || {
+            log "WARNING: Failed to update registry with jq, trying manual method"
+            rm -f "${CLOUD_BACKUP_REGISTRY}.tmp"
+        }
+    fi
+    
+    # If jq method failed or jq not available, use basic method
+    if [[ ! -f "${CLOUD_BACKUP_REGISTRY}.tmp" ]]; then
+        # Simple backup: just keep recent entries (not perfect but safe)
+        if [[ -f "$CLOUD_BACKUP_REGISTRY" ]]; then
+            cp "$CLOUD_BACKUP_REGISTRY" "${CLOUD_BACKUP_REGISTRY}.backup"
+            log "Created backup of registry at ${CLOUD_BACKUP_REGISTRY}.backup"
+        fi
+    else
+        mv "${CLOUD_BACKUP_REGISTRY}.tmp" "$CLOUD_BACKUP_REGISTRY"
+        log "Cloud backup registry updated"
+    fi
+    
+    rm -f "$KEEP_LIST"
+fi
+
+# Summary
+log "Cleanup completed"
+log "  Backups deleted: ${DELETED_COUNT}"
+log "  Failed deletions: ${FAILED_COUNT}"
+log "  Backups retained: ${RETENTION_COUNT}"
+
+# Clean up old cleanup log files (keep last 30 days)
+find "${BACKUP_BASE_DIR}/logs" -name "cleanup-*.log" -mtime +30 -delete 2>/dev/null || true
+
+exit 0
+

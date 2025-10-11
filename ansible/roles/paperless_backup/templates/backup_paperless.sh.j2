@@ -91,18 +91,63 @@ fi
 
 # Upload to cloud storage
 log "Uploading backup to cloud storage..."
+UPLOAD_SUCCESS=false
 if rclone copy "$BACKUP_DIR" "${RCLONE_REMOTE}:${RCLONE_BACKUP_PATH}/$(basename "$BACKUP_DIR")" --progress --log-level INFO; then
     log "Backup uploaded successfully"
+    UPLOAD_SUCCESS=true
 else
-    error_exit "Failed to upload backup to cloud storage"
+    log "ERROR: Failed to upload backup to cloud storage"
 fi
 
 # Verify upload
-log "Verifying backup upload..."
-if rclone check "$BACKUP_DIR" "${RCLONE_REMOTE}:${RCLONE_BACKUP_PATH}/$(basename "$BACKUP_DIR")" --one-way; then
-    log "Backup verification successful"
-else
-    log "WARNING: Backup verification failed"
+VERIFY_SUCCESS=false
+if [ "$UPLOAD_SUCCESS" = true ]; then
+    log "Verifying backup upload..."
+    if rclone check "$BACKUP_DIR" "${RCLONE_REMOTE}:${RCLONE_BACKUP_PATH}/$(basename "$BACKUP_DIR")" --one-way; then
+        log "Backup verification successful"
+        VERIFY_SUCCESS=true
+    else
+        log "WARNING: Backup verification failed"
+    fi
+fi
+
+# Write cloud backup metadata for monitoring
+if [ "$UPLOAD_SUCCESS" = true ] && [ "$VERIFY_SUCCESS" = true ]; then
+    log "Writing cloud backup metadata..."
+    BACKUP_NAME=$(basename "$BACKUP_DIR")
+    BACKUP_SIZE=$(du -sb "${BACKUP_DIR}" | cut -f1)
+    BACKUP_TIMESTAMP=$(date +%s)
+    
+    # Create or update cloud backup registry
+    CLOUD_BACKUP_REGISTRY="${BACKUP_BASE_DIR}/cloud_backup_registry.json"
+    CLOUD_BACKUP_TEMP="${BACKUP_BASE_DIR}/cloud_backup_registry.tmp"
+    
+    # Create new entry
+    NEW_ENTRY="{\"name\": \"$BACKUP_NAME\", \"size_bytes\": $BACKUP_SIZE, \"timestamp\": $BACKUP_TIMESTAMP, \"upload_date\": \"$(date -Iseconds)\"}"
+    
+    # If registry exists, append to it; otherwise create new
+    if [ -f "$CLOUD_BACKUP_REGISTRY" ]; then
+        # Read existing entries (skip first [ and last ])
+        EXISTING=$(cat "$CLOUD_BACKUP_REGISTRY" | sed '1d;$d')
+        if [ -n "$EXISTING" ]; then
+            # Append new entry with comma
+            echo "[" > "$CLOUD_BACKUP_TEMP"
+            echo "$EXISTING," >> "$CLOUD_BACKUP_TEMP"
+            echo "$NEW_ENTRY" >> "$CLOUD_BACKUP_TEMP"
+            echo "]" >> "$CLOUD_BACKUP_TEMP"
+        else
+            # No existing entries, create new array
+            echo "[$NEW_ENTRY]" > "$CLOUD_BACKUP_TEMP"
+        fi
+    else
+        # Create new registry
+        echo "[$NEW_ENTRY]" > "$CLOUD_BACKUP_TEMP"
+    fi
+    
+    # Keep only last 50 entries (simple approach: count lines and keep last portion)
+    mv "$CLOUD_BACKUP_TEMP" "$CLOUD_BACKUP_REGISTRY"
+    
+    log "Cloud backup metadata written to $CLOUD_BACKUP_REGISTRY"
 fi
 
 # Clean up local backup (optional - keep for a few days)

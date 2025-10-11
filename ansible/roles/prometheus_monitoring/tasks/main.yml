@@ -11,9 +11,8 @@
     - "{{ prometheus_config_dir }}"
     - "{{ alertmanager_data_dir }}"
     - "{{ alertmanager_config_dir }}"
-    - "{{ grafana_monitoring_data_dir }}"
-    - "{{ grafana_monitoring_config_dir }}"
-  when: prometheus_enabled or alertmanager_enabled or grafana_monitoring_enabled
+    - "{{ blackbox_exporter_config_dir }}"
+  when: prometheus_enabled or alertmanager_enabled
 
 - name: Create Prometheus configuration
   template:
@@ -33,14 +32,50 @@
     mode: '0644'
   when: alertmanager_enabled
 
-- name: Create Grafana monitoring configuration
+- name: Create Blackbox Exporter configuration
   template:
-    src: grafana-monitoring.ini.j2
-    dest: "{{ grafana_monitoring_config_dir }}/grafana.ini"
+    src: blackbox.yml.j2
+    dest: "{{ blackbox_exporter_config_dir }}/blackbox.yml"
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0644'
-  when: grafana_monitoring_enabled
+  when: blackbox_exporter_enabled
+
+- name: Create Backup Exporter script
+  copy:
+    src: backup_exporter.py
+    dest: "{{ backup_base_dir }}/backup_exporter.py"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  when: backup_exporter_enabled
+
+- name: Create backup metrics script
+  template:
+    src: backup_metrics.sh
+    dest: "/opt/backup_metrics.sh"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  when: backup_exporter_enabled
+
+- name: Create textfile collector directory
+  file:
+    path: "/var/lib/node_exporter/textfile_collector"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  when: backup_exporter_enabled
+
+- name: Add cron job for backup metrics
+  cron:
+    name: "Backup metrics collection"
+    minute: "*/5"
+    job: "/opt/backup_metrics.sh"
+    user: "{{ ansible_user }}"
+  when: backup_exporter_enabled
+
 
 - name: Create Docker Compose for monitoring stack
   template:
@@ -49,14 +84,14 @@
     owner: "{{ ansible_user }}"
     group: "{{ ansible_user }}"
     mode: '0644'
-  when: prometheus_enabled or alertmanager_enabled or grafana_monitoring_enabled
+  when: prometheus_enabled or alertmanager_enabled
 
 - name: Create monitoring network
   community.docker.docker_network:
     name: monitoring
     state: present
   become_user: "{{ ansible_user }}"
-  when: prometheus_enabled or alertmanager_enabled or grafana_monitoring_enabled
+  when: prometheus_enabled or alertmanager_enabled
 
 - name: Start monitoring stack
   shell: |
@@ -64,34 +99,40 @@
     docker-compose -f docker-compose-monitoring.yml pull
     docker-compose -f docker-compose-monitoring.yml up -d
   become_user: "{{ ansible_user }}"
-  when: prometheus_enabled or alertmanager_enabled or grafana_monitoring_enabled
+  when: prometheus_enabled or alertmanager_enabled
 
-- name: Wait for services to be ready
+- name: Wait for Prometheus to be ready
   wait_for:
-    port: "{{ item.port }}"
-    host: "{{ item.host }}"
+    port: "{{ prometheus_port }}"
+    host: "localhost"
     delay: 10
     timeout: 60
-  loop:
-    - { port: "{{ prometheus_port }}", host: "localhost" }
-    - { port: "{{ alertmanager_port }}", host: "localhost" }
-    - { port: "{{ grafana_monitoring_port }}", host: "localhost" }
-  when: prometheus_enabled or alertmanager_enabled or grafana_monitoring_enabled
+  when: prometheus_enabled
+
+- name: Wait for Alertmanager to be ready
+  wait_for:
+    port: "{{ alertmanager_port }}"
+    host: "localhost"
+    delay: 10
+    timeout: 60
+  when: alertmanager_enabled
+
 
 - name: Configure Prometheus data source in main Grafana
   uri:
     url: "http://localhost:3000/api/datasources"
     method: POST
     body_format: json
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Basic {{ (grafana_admin_user + ':' + grafana_admin_password) | b64encode }}"
     body:
       name: "Prometheus"
       type: "prometheus"
       url: "http://prometheus:{{ prometheus_port }}"
       access: "proxy"
       isDefault: false
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
-    status_code: 200
+    status_code: [200, 409]
   ignore_errors: true
   when: prometheus_enabled
 
@@ -100,14 +141,41 @@
     url: "http://localhost:3000/api/datasources"
     method: POST
     body_format: json
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Basic {{ (grafana_admin_user + ':' + grafana_admin_password) | b64encode }}"
     body:
       name: "Loki"
       type: "loki"
       url: "http://loki:3100"
       access: "proxy"
       isDefault: true
-    user: "{{ grafana_admin_user }}"
-    password: "{{ grafana_admin_password }}"
-    status_code: 200
+    status_code: [200, 409]
+  ignore_errors: true
+  when: prometheus_enabled
+
+- name: Deploy system monitoring dashboard to Grafana
+  uri:
+    url: "http://localhost:3000/api/dashboards/db"
+    method: POST
+    body_format: json
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Basic {{ (grafana_admin_user + ':' + grafana_admin_password) | b64encode }}"
+    body: "{{ lookup('file', 'templates/system-dashboard.json') | from_json }}"
+    status_code: [200, 409]
+  ignore_errors: true
+  when: prometheus_enabled
+
+- name: Deploy software monitoring dashboard to Grafana
+  uri:
+    url: "http://localhost:3000/api/dashboards/db"
+    method: POST
+    body_format: json
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Basic {{ (grafana_admin_user + ':' + grafana_admin_password) | b64encode }}"
+    body: "{{ lookup('file', 'templates/software-dashboard.json') | from_json }}"
+    status_code: [200, 409]
   ignore_errors: true
   when: prometheus_enabled

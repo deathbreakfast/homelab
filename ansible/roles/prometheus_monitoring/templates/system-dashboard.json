@@ -1,0 +1,508 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Homelab System Monitoring",
+    "tags": ["homelab", "system", "monitoring"],
+    "style": "dark",
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "CPU Usage",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+            "legendFormat": "{{instance}} - CPU Usage %",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 70},
+                {"color": "red", "value": 90}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Memory Usage",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
+            "legendFormat": "{{instance}} - Memory Usage %",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 80},
+                {"color": "red", "value": 95}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Storage Usage by Device",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "(1 - (node_filesystem_avail_bytes{fstype=~\"ext4|vfat\"} / node_filesystem_size_bytes{fstype=~\"ext4|vfat\"})) * 100",
+            "legendFormat": "{{device}} on {{instance}} ({{mountpoint}})",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 75},
+                {"color": "red", "value": 90}
+              ]
+            },
+            "mappings": [],
+            "color": {
+              "mode": "thresholds"
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "System Load Average",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "node_load1",
+            "legendFormat": "1m Load",
+            "datasource": "Prometheus"
+          },
+          {
+            "expr": "node_load5",
+            "legendFormat": "5m Load",
+            "datasource": "Prometheus"
+          },
+          {
+            "expr": "node_load15",
+            "legendFormat": "15m Load",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {
+              "mode": "thresholds"
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0}
+      },
+      {
+        "id": 5,
+        "title": "CPU Usage Over Time",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+            "legendFormat": "{{instance}}",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 6,
+        "title": "Memory Usage Over Time",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
+            "legendFormat": "{{instance}}",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 7,
+        "title": "Storage Usage by Device and Mount Point",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "(1 - (node_filesystem_avail_bytes{fstype=~\"ext4|vfat\"} / node_filesystem_size_bytes{fstype=~\"ext4|vfat\"})) * 100",
+            "legendFormat": "{{device}} on {{instance}} ({{mountpoint}})",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 75},
+                {"color": "red", "value": 90}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 8,
+        "title": "Storage Capacity by Device",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "node_filesystem_size_bytes{fstype=~\"ext4|vfat\"}",
+            "legendFormat": "Total Size",
+            "datasource": "Prometheus",
+            "format": "table",
+            "instant": true
+          },
+          {
+            "expr": "node_filesystem_avail_bytes{fstype=~\"ext4|vfat\"}",
+            "legendFormat": "Available",
+            "datasource": "Prometheus",
+            "format": "table",
+            "instant": true
+          },
+          {
+            "expr": "node_filesystem_size_bytes{fstype=~\"ext4|vfat\"} - node_filesystem_avail_bytes{fstype=~\"ext4|vfat\"}",
+            "legendFormat": "Used",
+            "datasource": "Prometheus",
+            "format": "table",
+            "instant": true
+          },
+          {
+            "expr": "(1 - (node_filesystem_avail_bytes{fstype=~\"ext4|vfat\"} / node_filesystem_size_bytes{fstype=~\"ext4|vfat\"})) * 100",
+            "legendFormat": "Usage %",
+            "datasource": "Prometheus",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes",
+            "custom": {
+              "displayMode": "table",
+              "inspect": false
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {"id": "byName", "options": "Usage %"},
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "percent"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "showHeader": true,
+          "sortBy": [
+            {
+              "desc": false,
+              "displayName": "Instance"
+            }
+          ]
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      },
+      {
+        "id": 9,
+        "title": "Storage Usage Visualization",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "(1 - (node_filesystem_avail_bytes{fstype=~\"ext4|vfat\"} / node_filesystem_size_bytes{fstype=~\"ext4|vfat\"})) * 100",
+            "legendFormat": "{{device}} on {{instance}} ({{mountpoint}})",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 75},
+                {"color": "red", "value": 90}
+              ]
+            }
+          }
+        },
+        "options": {
+          "orientation": "horizontal",
+          "displayMode": "gradient",
+          "showUnfilled": true
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
+      },
+      {
+        "id": 10,
+        "title": "System Load Average",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "node_load1",
+            "legendFormat": "1m Load",
+            "datasource": "Prometheus"
+          },
+          {
+            "expr": "node_load5",
+            "legendFormat": "5m Load",
+            "datasource": "Prometheus"
+          },
+          {
+            "expr": "node_load15",
+            "legendFormat": "15m Load",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 24}
+      },
+      {
+        "id": 11,
+        "title": "Network Traffic",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(node_network_receive_bytes_total[5m])",
+            "legendFormat": "{{instance}} RX",
+            "datasource": "Prometheus"
+          },
+          {
+            "expr": "rate(node_network_transmit_bytes_total[5m])",
+            "legendFormat": "{{instance}} TX",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "Bps"
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 24}
+      },
+      {
+        "id": 12,
+        "title": "CPU Usage by Host",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+            "legendFormat": "{{instance}}",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 70},
+                {"color": "red", "value": 90}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 32}
+      },
+      {
+        "id": 13,
+        "title": "Memory Usage by Host",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
+            "legendFormat": "{{instance}}",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 80},
+                {"color": "red", "value": 95}
+              ]
+            }
+          }
+        },
+        "options": {
+          "reduceOptions": {
+            "values": false,
+            "calcs": ["lastNotNull"],
+            "fields": ""
+          },
+          "orientation": "auto",
+          "textMode": "auto",
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto"
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 32}
+      },
+      {
+        "id": 14,
+        "title": "CPU Usage Breakdown by Core",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "100 - (irate(node_cpu_seconds_total{mode=\"idle\"}[5m]) * 100)",
+            "legendFormat": "{{instance}} - CPU{{cpu}}",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32}
+      },
+      {
+        "id": 15,
+        "title": "Memory Breakdown by Type",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "node_memory_MemTotal_bytes",
+            "legendFormat": "{{instance}} - Total",
+            "datasource": "Prometheus"
+          },
+          {
+            "expr": "node_memory_MemAvailable_bytes",
+            "legendFormat": "{{instance}} - Available",
+            "datasource": "Prometheus"
+          },
+          {
+            "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes",
+            "legendFormat": "{{instance}} - Used",
+            "datasource": "Prometheus"
+          },
+          {
+            "expr": "node_memory_Buffers_bytes",
+            "legendFormat": "{{instance}} - Buffers",
+            "datasource": "Prometheus"
+          },
+          {
+            "expr": "node_memory_Cached_bytes",
+            "legendFormat": "{{instance}} - Cached",
+            "datasource": "Prometheus"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bytes"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40}
+      }
+    ]
+  }
+}
+

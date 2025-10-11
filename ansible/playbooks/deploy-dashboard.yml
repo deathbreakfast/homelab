@@ -1,0 +1,19 @@
+---
+- name: Deploy Grafana Dashboard
+  hosts: rpi4b-01
+  become: yes
+  tasks:
+    - name: Deploy system monitoring dashboard to Grafana
+      uri:
+        url: "http://localhost:3000/api/dashboards/db"
+        method: POST
+        body_format: json
+        headers:
+          Content-Type: "application/json"
+          Authorization: "Basic {{ (grafana_admin_user + ':' + grafana_admin_password) | b64encode }}"
+        body: "{{ lookup('file', '/home/seanorourke/homelab/ansible/roles/prometheus_monitoring/templates/system-dashboard.json') | from_json }}"
+        status_code: [200, 409]
+      ignore_errors: true
+      vars:
+        grafana_admin_user: "admin"
+        grafana_admin_password: "{{ vault_grafana_admin_password | default('admin') }}"

@@ -46,3 +46,53 @@ scrape_configs:
           instance: '{{ target.name }}'
           job: 'loki'
 {% endfor %}
+
+  # Paperless availability monitoring
+  - job_name: 'paperless'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+{% for target in monitoring_targets %}
+      - targets: ['{{ target.host }}:8000']
+        labels:
+          instance: '{{ target.name }}'
+          job: 'paperless'
+{% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # Backup metrics
+  - job_name: 'backup-exporter'
+    static_configs:
+{% for target in monitoring_targets %}
+      - targets: ['{{ target.host }}:{{ backup_exporter_port }}']
+        labels:
+          instance: '{{ target.name }}'
+          job: 'backup-exporter'
+{% endfor %}
+
+  # Paperless GPT availability monitoring
+  - job_name: 'paperless-gpt'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+{% for target in monitoring_targets %}
+      - targets: ['{{ target.host }}:8080']
+        labels:
+          instance: '{{ target.name }}'
+          job: 'paperless-gpt'
+{% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

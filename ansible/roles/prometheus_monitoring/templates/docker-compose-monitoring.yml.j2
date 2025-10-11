@@ -56,32 +56,6 @@ services:
           cpus: '{{ alertmanager_cpu_limit }}'
 {% endif %}
 
-{% if grafana_monitoring_enabled %}
-  grafana-monitoring:
-    image: grafana/grafana:latest
-    container_name: grafana-monitoring
-    restart: unless-stopped
-    ports:
-      - "{{ grafana_monitoring_port }}:3000"
-    volumes:
-      - {{ grafana_monitoring_data_dir }}:/var/lib/grafana
-      - {{ grafana_monitoring_config_dir }}/grafana.ini:/etc/grafana/grafana.ini
-    environment:
-      - GF_SECURITY_ADMIN_USER={{ grafana_admin_user }}
-      - GF_SECURITY_ADMIN_PASSWORD={{ grafana_admin_password }}
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_PATHS_DATA=/var/lib/grafana
-    user: "1001:1001"
-    networks:
-      - monitoring
-    depends_on:
-      - prometheus
-    deploy:
-      resources:
-        limits:
-          memory: {{ grafana_monitoring_memory_limit }}
-          cpus: '{{ grafana_monitoring_cpu_limit }}'
-{% endif %}
 
 {% if node_exporter_enabled %}
   node-exporter:
@@ -123,4 +97,46 @@ services:
     user: "1001:1001"
     networks:
       - monitoring
+{% endif %}
+
+{% if blackbox_exporter_enabled %}
+  blackbox-exporter:
+    image: prom/blackbox-exporter:latest
+    container_name: blackbox-exporter
+    restart: unless-stopped
+    ports:
+      - "{{ blackbox_exporter_port }}:{{ blackbox_exporter_port }}"
+    command:
+      - '--config.file=/etc/blackbox_exporter/config.yml'
+    volumes:
+      - {{ blackbox_exporter_config_dir }}/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    user: "1001:1001"
+    networks:
+      - monitoring
+{% endif %}
+
+{% if backup_exporter_enabled %}
+  backup-exporter:
+    image: python:3.11-alpine
+    container_name: backup-exporter
+    restart: unless-stopped
+    ports:
+      - "{{ backup_exporter_port }}:{{ backup_exporter_port }}"
+    command:
+      - python
+      - {{ backup_base_dir }}/backup_exporter.py
+      - --backup-dir={{ backup_base_dir }}
+      - --rclone-remote={{ rclone_remote }}
+      - --port={{ backup_exporter_port }}
+    volumes:
+      - {{ backup_base_dir }}:{{ backup_base_dir }}:ro
+      - /etc/rclone:/etc/rclone:ro
+      - /usr/bin/rclone:/usr/bin/rclone:ro
+    environment:
+      - RCLONE_CONFIG=/etc/rclone/rclone.conf
+    user: "1001:1001"
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
 {% endif %}

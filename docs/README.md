@@ -44,6 +44,10 @@ Welcome to the Homelab documentation! This guide will walk you through setting u
     - [Document Management](services.md#document-management-services)
     - [Monitoring Services](services.md#monitoring-services)
     - [Infrastructure Services](services.md#infrastructure-services)
+13. [Git Setup](git-setup.md)
+    - [Security Considerations](git-setup.md#security-considerations)
+    - [Repository Setup](git-setup.md#git-repository-setup)
+    - [Workflow Recommendations](git-setup.md#workflow-recommendations)
 
 ## Quick Start
 

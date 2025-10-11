@@ -16,6 +16,13 @@
     # OpenAI API Key (should be set in vault)
     paperless_gpt_openai_api_key: "{{ vault_openai_api_key }}"
     
+    # Fallback to Ollama if needed (uncomment to use Ollama instead of OpenAI)
+    # paperless_gpt_llm_provider: "ollama"
+    # paperless_gpt_llm_model: "qwen3:8b"
+    # paperless_gpt_vision_llm_provider: "ollama"
+    # paperless_gpt_vision_llm_model: "qwen3:8b"
+    # paperless_gpt_ollama_host: "http://192.168.0.11:11434"
+    
     # Token limits for smaller models
     paperless_gpt_token_limit: 2000
     
