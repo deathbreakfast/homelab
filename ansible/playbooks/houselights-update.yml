@@ -1,0 +1,13 @@
+---
+- name: Update houselights controller
+  hosts: houselights
+  become: true
+  tags:
+    - houselights
+    - houselights_update
+  tasks:
+    - name: Apply houselights update tasks
+      ansible.builtin.include_role:
+        name: houselights
+        tasks_from: update.yml
+

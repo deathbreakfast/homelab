@@ -104,6 +104,34 @@ ansible-playbook ansible/playbooks/paperless.yml --limit "rpi1"
 ansible-playbook ansible/playbooks/paperless-gpt.yml
 ```
 
+### `houselights.yml`
+**Purpose**: Deploys the houselights Flask controller onto the `houselights` Raspberry Pi and ensures the service stays running.
+
+**Key Features**:
+- Installs required Python tooling and Git
+- Clones `deathbreakfast/house-lights` into `/opt/houselights`
+- Creates and manages a dedicated Python virtualenv
+- Templates environment variables from host vars (LED count, GPIO pin, port)
+- Registers and starts a `systemd` service (`houselights.service`)
+
+**Usage**:
+```bash
+# First-time deployment / ensure service healthy
+ansible-playbook ansible/playbooks/houselights.yml
+
+# Limit to the houselights node explicitly (optional)
+ansible-playbook ansible/playbooks/houselights.yml --limit "houselights"
+```
+
+### `houselights-update.yml`
+**Purpose**: Pulls the latest code from GitHub, refreshes dependencies, and restarts the houselights service without re-running base package setup.
+
+**Usage**:
+```bash
+# Update houselights application to the latest commit on the configured branch
+ansible-playbook ansible/playbooks/houselights-update.yml
+```
+
 ## Monitoring & Logging Playbooks
 
 ### `monitoring.yml`

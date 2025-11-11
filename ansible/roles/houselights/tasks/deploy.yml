@@ -1,0 +1,54 @@
+---
+- name: Deploy houselights repository
+  become: true
+  become_user: "{{ houselights_user }}"
+  ansible.builtin.git:
+    repo: "{{ houselights_repo_url }}"
+    version: "{{ houselights_repo_version }}"
+    dest: "{{ houselights_app_dir }}"
+    update: true
+    force: false
+  register: houselights_git
+  tags:
+    - houselights
+    - houselights_code
+
+- name: Ensure Python virtual environment exists
+  become: true
+  become_user: "{{ houselights_user }}"
+  ansible.builtin.command:
+    cmd: "python3 -m venv {{ houselights_venv_dir }}"
+    creates: "{{ houselights_venv_dir }}/bin/activate"
+  tags:
+    - houselights
+    - houselights_virtualenv
+
+- name: Install Python requirements
+  become: true
+  become_user: "{{ houselights_user }}"
+  vars:
+    requirements_file: "{{ houselights_app_dir }}/requirements.txt"
+  block:
+    - name: Check if requirements.txt exists
+      ansible.builtin.stat:
+        path: "{{ requirements_file }}"
+      register: houselights_requirements
+
+    - name: Install Python dependencies from requirements.txt
+      ansible.builtin.pip:
+        requirements: "{{ requirements_file }}"
+        virtualenv: "{{ houselights_venv_dir }}"
+        virtualenv_python: python3
+      when: houselights_requirements.stat.exists
+
+    - name: Install extra Python dependencies
+      ansible.builtin.pip:
+        name: "{{ houselights_extra_requirements }}"
+        state: present
+        virtualenv: "{{ houselights_venv_dir }}"
+        virtualenv_python: python3
+      when: houselights_extra_requirements | length > 0
+  tags:
+    - houselights
+    - houselights_dependencies
+

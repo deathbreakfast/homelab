@@ -1,0 +1,20 @@
+[Unit]
+Description=House Lights Web Controller
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ houselights_user }}
+Group={{ houselights_group }}
+WorkingDirectory={{ houselights_app_dir }}
+EnvironmentFile={{ houselights_env_file }}
+ExecStart={{ houselights_venv_dir }}/bin/flask run
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+SyslogIdentifier={{ houselights_service_name }}
+
+[Install]
+WantedBy=multi-user.target
+

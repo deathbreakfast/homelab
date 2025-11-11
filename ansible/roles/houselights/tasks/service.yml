@@ -1,0 +1,37 @@
+---
+- name: Render houselights environment file
+  become: true
+  ansible.builtin.template:
+    src: houselights.env.j2
+    dest: "{{ houselights_env_file }}"
+    owner: "{{ houselights_user }}"
+    group: "{{ houselights_group }}"
+    mode: "0640"
+  notify: restart houselights service
+  tags:
+    - houselights
+    - houselights_service
+
+- name: Render houselights systemd service
+  become: true
+  ansible.builtin.template:
+    src: houselights.service.j2
+    dest: "{{ houselights_systemd_unit }}"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  notify: restart houselights service
+  tags:
+    - houselights
+    - houselights_service
+
+- name: Ensure houselights service is enabled and running
+  become: true
+  ansible.builtin.systemd:
+    name: "{{ houselights_service_name }}"
+    enabled: true
+    state: started
+  tags:
+    - houselights
+    - houselights_service
+

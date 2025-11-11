@@ -1,0 +1,25 @@
+---
+# Default configuration values for houselights role
+
+houselights_repo_url: "https://github.com/deathbreakfast/house-lights.git"
+houselights_repo_version: "main"
+houselights_user: "pi"
+houselights_group: "pi"
+houselights_base_dir: "/opt/houselights"
+houselights_app_dir: "{{ houselights_base_dir }}/app"
+houselights_venv_dir: "{{ houselights_base_dir }}/venv"
+houselights_service_name: "houselights"
+houselights_service_port: "{{ houselights_app.web_port | default(8070) }}"
+houselights_env_file: "{{ houselights_base_dir }}/.env"
+houselights_systemd_unit: "/etc/systemd/system/{{ houselights_service_name }}.service"
+
+# Heartbeat logging options
+houselights_heartbeat_log: "/var/log/houselights-heartbeat.log"
+houselights_heartbeat_interval: "{{ houselights_app.heartbeat_interval | default('5m') }}"
+
+# Minimal requirements in case upstream file changes
+houselights_extra_requirements: []
+
+# Enable tmpfs for runtime files to limit SD card writes
+houselights_runtime_tmpfs: true
+

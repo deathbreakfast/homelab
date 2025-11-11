@@ -1,0 +1,9 @@
+---
+- name: Deploy and manage houselights controller
+  hosts: houselights
+  become: true
+  tags:
+    - houselights
+  roles:
+    - role: houselights
+

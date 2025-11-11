@@ -1,0 +1,19 @@
+---
+# Host-specific configuration for houselights (Raspberry Pi 3B)
+# These variables will feed the custom house-lights controller role/playbooks.
+
+houselights_app:
+  gpio_pin: 4                # GPIO4 (physical pin 7)
+  led_count: 50              # Number of individually addressable LEDs on the strand
+  web_port: 8070             # Placeholder port for the web UI
+  heartbeat_interval: "5m"   # Interval for lightweight heartbeat logging
+  light_ranges: "0-49"       # Simple range covering 50 LEDs on a single strand
+  gpio_pins_env: "4"         # Comma-separated list expected by app
+
+# Convenience environment map for future templates or systemd units.
+houselights_env:
+  HOUSELIGHTS_GPIO_PIN: "{{ houselights_app.gpio_pin }}"
+  HOUSELIGHTS_LED_COUNT: "{{ houselights_app.led_count }}"
+  HOUSELIGHTS_WEB_PORT: "{{ houselights_app.web_port }}"
+
+

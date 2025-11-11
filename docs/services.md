@@ -260,6 +260,25 @@ This document provides detailed information about all services deployed in the h
 - Web Interface: `http://<host>:8000`
 - Static Files: Served directly by Nginx
 
+### Houselights Controller
+**Purpose**: Custom Python web application for controlling individually addressable RGB lighting.
+
+**Key Features**:
+- Flask-based web UI for pattern selection (in development)
+- REST endpoints for light control (planned)
+- Environment-driven GPIO configuration
+- Lightweight heartbeat logging to protect SD card longevity
+
+**Configuration**:
+- **Port**: 8070 (configurable via `houselights_app.web_port`)
+- **Repository**: `https://github.com/deathbreakfast/house-lights`
+- **Service Unit**: `houselights.service`
+- **Runtime Directory**: `/opt/houselights`
+
+**Access**:
+- Web Interface: `http://houselights:8070/`
+- Health Check: `http://houselights:8070/` (returns HTTP 200 when the Flask server is running)
+
 ## Service Dependencies
 
 ### Paperless Stack
