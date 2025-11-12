@@ -12,6 +12,7 @@
   tags:
     - houselights
     - houselights_code
+  notify: restart houselights service
 
 - name: Ensure Python virtual environment exists
   become: true
@@ -40,6 +41,7 @@
         virtualenv: "{{ houselights_venv_dir }}"
         virtualenv_python: python3
       when: houselights_requirements.stat.exists
+      notify: restart houselights service
 
     - name: Install extra Python dependencies
       ansible.builtin.pip:
@@ -48,7 +50,9 @@
         virtualenv: "{{ houselights_venv_dir }}"
         virtualenv_python: python3
       when: houselights_extra_requirements | length > 0
+      notify: restart houselights service
   tags:
     - houselights
     - houselights_dependencies
+
 

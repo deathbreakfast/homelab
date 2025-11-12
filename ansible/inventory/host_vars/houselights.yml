@@ -3,17 +3,25 @@
 # These variables will feed the custom house-lights controller role/playbooks.
 
 houselights_app:
-  gpio_pin: 4                # GPIO4 (physical pin 7)
-  led_count: 50              # Number of individually addressable LEDs on the strand
+  enable_hardware: true
   web_port: 8070             # Placeholder port for the web UI
   heartbeat_interval: "5m"   # Interval for lightweight heartbeat logging
-  light_ranges: "0-49"       # Simple range covering 50 LEDs on a single strand
-  gpio_pins_env: "4"         # Comma-separated list expected by app
+  light_ranges: "0-49"       # Single strand covering 50 LEDs
+  # Use only PWM/PCM-capable pins for WS281x: GPIO12, GPIO13, GPIO18, GPIO19.
+  gpio_pins:
+    18: Roof line 1           # GPIO18 (physical pin 12)
+    13: Roof line 2           # GPIO13 (physical pin 33)
+  pin_led_counts:
+    18: 50
+    13: 50
+
+houselights_extra_requirements:
+  - "rpi-ws281x==5.0.0"
+
+houselights_service_user: root
+houselights_service_group: root
 
 # Convenience environment map for future templates or systemd units.
-houselights_env:
-  HOUSELIGHTS_GPIO_PIN: "{{ houselights_app.gpio_pin }}"
-  HOUSELIGHTS_LED_COUNT: "{{ houselights_app.led_count }}"
-  HOUSELIGHTS_WEB_PORT: "{{ houselights_app.web_port }}"
+houselights_env: {}  # e.g. {"HOUSE_LIGHTS_LOG_LEVEL": "DEBUG"}
 
 

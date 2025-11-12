@@ -43,6 +43,7 @@ graph TD
     subgraph "Mini Rack"
         I[TP-Link TL-SG105<br/>5-Port Gigabit Switch<br/>Unmanaged]
         H[Raspberry Pi 4B<br/>rpi4b-01<br/>192.168.0.45<br/>Paperless-ngx]
+        HL[Raspberry Pi 3B<br/>houselights<br/>192.168.1.121<br/>Holiday Lights Controller]
         J[Raspberry Pi 4B<br/>homeassistant<br/>192.168.0.43<br/>Home Assistant OS]
     end
     
@@ -64,6 +65,7 @@ graph TD
     D -->|Ethernet Port| K
     D -->|Ethernet Port| L
     I -->|Ethernet Port| H
+    I -->|Ethernet Port| HL
     I -->|Ethernet Port| J
     
     style A fill:#1565c0,color:#ffffff,stroke:#0d47a1,stroke-width:2px
@@ -75,6 +77,7 @@ graph TD
     style G fill:#c2185b,color:#ffffff,stroke:#880e4f,stroke-width:2px
     style I fill:#795548,color:#ffffff,stroke:#3e2723,stroke-width:2px
     style H fill:#00695c,color:#ffffff,stroke:#004d40,stroke-width:2px
+    style HL fill:#ff6f00,color:#ffffff,stroke:#e65100,stroke-width:2px
     style J fill:#4caf50,color:#ffffff,stroke:#2e7d32,stroke-width:2px
     style K fill:#ff9800,color:#ffffff,stroke:#e65100,stroke-width:2px
     style L fill:#673ab7,color:#ffffff,stroke:#4527a0,stroke-width:2px
@@ -132,6 +135,7 @@ graph TD
 - **Mini Rack Switch**: TP-Link TL-SG105 (5-port gigabit unmanaged switch)
 - **Services**: 
   - Raspberry Pi 4B running Paperless-ngx (192.168.0.45)
+  - Raspberry Pi 3B running Houselights controller (192.168.1.121)
   - Raspberry Pi 4B running Home Assistant OS (192.168.0.43)
   - NAS Server (i7-9900, 16GB RAM, 10x 3TB HDD, FreeNAS/OpenNAS) - Under Construction
   - 3 Desktop Gaming Computers (Wired)
@@ -143,6 +147,10 @@ graph TD
   - **Sensors**: 8 Temperature Sensors, 3 Motion Sensors
   - **Lighting**: ~30 Smart Bulbs
   - **Entertainment**: 6 Smart TVs
+
+### Custom Services
+- `rpi4b-01`: Paperless-ngx document management stack
+- `houselights`: Holiday lighting controller from [`deathbreakfast/house-lights`](https://github.com/deathbreakfast/house-lights)
 
 ## Documentation
 
@@ -189,6 +197,8 @@ The inventory is organized by device type and location. See `ansible/inventory/`
 - **houselights** (192.168.1.121) - Raspberry Pi 3B planned for holiday RGB lighting control
 
 ### Houselights Controller
+The controller pulls code from [`deathbreakfast/house-lights`](https://github.com/deathbreakfast/house-lights) and runs it as a managed Flask service on the `houselights` Pi.
+
 - Deploy / ensure service is running:
   ```bash
   ansible-playbook -i ansible/inventory/hosts ansible/playbooks/houselights.yml

@@ -5,8 +5,11 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User={{ houselights_user }}
-Group={{ houselights_group }}
+User={{ houselights_service_user }}
+Group={{ houselights_service_group }}
+SupplementaryGroups=systemd-journal video gpio kmem
+AmbientCapabilities=CAP_SYS_RAWIO CAP_SYS_NICE
+CapabilityBoundingSet=CAP_SYS_RAWIO CAP_SYS_NICE
 WorkingDirectory={{ houselights_app_dir }}
 EnvironmentFile={{ houselights_env_file }}
 ExecStart={{ houselights_venv_dir }}/bin/flask run
@@ -17,4 +20,5 @@ SyslogIdentifier={{ houselights_service_name }}
 
 [Install]
 WantedBy=multi-user.target
+
 

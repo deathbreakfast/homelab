@@ -12,6 +12,17 @@ houselights_service_name: "houselights"
 houselights_service_port: "{{ houselights_app.web_port | default(8070) }}"
 houselights_env_file: "{{ houselights_base_dir }}/.env"
 houselights_systemd_unit: "/etc/systemd/system/{{ houselights_service_name }}.service"
+houselights_service_user: "{{ houselights_user }}"
+houselights_service_group: "{{ houselights_group }}"
+
+# Application-level defaults; host_vars should override with real hardware config.
+houselights_app:
+  enable_hardware: false
+  web_port: 8070
+  heartbeat_interval: "5m"
+  light_ranges: "not-configured"
+  gpio_pins: {}
+  pin_led_counts: {}
 
 # Heartbeat logging options
 houselights_heartbeat_log: "/var/log/houselights-heartbeat.log"
@@ -22,4 +33,5 @@ houselights_extra_requirements: []
 
 # Enable tmpfs for runtime files to limit SD card writes
 houselights_runtime_tmpfs: true
+
 
