@@ -55,4 +55,21 @@
     - houselights
     - houselights_dependencies
 
+- name: Build houselights v2 frontend assets
+  become: true
+  become_user: "{{ houselights_user }}"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    bash {{ houselights_frontend_build_script }}
+  args:
+    chdir: "{{ houselights_app_dir }}"
+  when:
+    - houselights_build_v2 | bool
+    - houselights_git is defined
+    - (houselights_git.changed | default(false)) or (houselights_force_v2_build | bool)
+  tags:
+    - houselights
+    - houselights_frontend
+  notify: restart houselights service
+
 

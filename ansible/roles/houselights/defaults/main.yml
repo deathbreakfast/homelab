@@ -34,4 +34,19 @@ houselights_extra_requirements: []
 # Enable tmpfs for runtime files to limit SD card writes
 houselights_runtime_tmpfs: true
 
+# Controller / follower defaults
+houselights_is_controller: true
+houselights_controller_host: ""
+houselights_device_metadata: {}
+
+# Frontend build configuration
+houselights_build_v2: true
+houselights_force_v2_build: false
+houselights_v2_frontend_dir: "{{ houselights_app_dir }}/src/static/v2"
+houselights_v2_dist_dir: "{{ houselights_v2_frontend_dir }}/dist"
+houselights_frontend_build_script: "scripts/build_v2.sh"
+houselights_node_packages:
+  - nodejs
+  - npm
+
 

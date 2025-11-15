@@ -1,4 +1,7 @@
 ---
+- name: Include setup tasks
+  ansible.builtin.import_tasks: setup.yml
+
 - name: Include deployment tasks
   ansible.builtin.import_tasks: deploy.yml
 
